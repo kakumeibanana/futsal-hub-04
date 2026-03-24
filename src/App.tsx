@@ -28,7 +28,6 @@ const App = () => (
             <Route path="/news" element={<NewsPage />} />
             <Route path="/videos" element={<VideosPage />} />
             <Route path="/gallery" element={<GalleryPage />} />
-            <Route path="/gallery" element={<GalleryPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
