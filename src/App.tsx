@@ -9,7 +9,6 @@ import Index from "./pages/Index";
 import SchedulePage from "./pages/SchedulePage";
 import NewsPage from "./pages/NewsPage";
 import VideosPage from "./pages/VideosPage";
-import AboutPage from "./pages/AboutPage";
 import GalleryPage from "./pages/GalleryPage";
 import NotFound from "./pages/NotFound";
 
