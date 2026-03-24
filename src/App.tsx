@@ -9,7 +9,6 @@ import Index from "./pages/Index";
 import SchedulePage from "./pages/SchedulePage";
 import NewsPage from "./pages/NewsPage";
 import VideosPage from "./pages/VideosPage";
-import AboutPage from "./pages/AboutPage";
 import GalleryPage from "./pages/GalleryPage";
 import NotFound from "./pages/NotFound";
 
@@ -28,7 +27,6 @@ const App = () => (
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/news" element={<NewsPage />} />
             <Route path="/videos" element={<VideosPage />} />
-            <Route path="/about" element={<AboutPage />} />
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
