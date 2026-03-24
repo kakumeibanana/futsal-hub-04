@@ -1,9 +1,8 @@
 import { Link } from "react-router-dom";
-import { CalendarDays, ArrowRight, Bell, ImageIcon } from "lucide-react";
+import { CalendarDays, ArrowRight, Bell, ImageIcon, Users, Trophy, Target, Heart } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import ScheduleCard from "@/components/ScheduleCard";
-import ScheduleTag from "@/components/ScheduleTag";
 import { scheduleEvents, newsItems } from "@/data/sampleData";
 import heroImage from "@/assets/hero-futsal.jpg";
 import trainingImg from "@/assets/training.jpg";
@@ -20,58 +19,98 @@ const fadeUp = {
   visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.5 } }),
 };
 
-const SectionHeader = ({ icon: Icon, title, linkTo, linkLabel }: { icon: any; title: string; linkTo: string; linkLabel: string }) => (
+const stats = [
+  { icon: Users, label: "部員数", value: "22名" },
+  { icon: Trophy, label: "創部", value: "2020年" },
+  { icon: Target, label: "活動日", value: "週4日" },
+  { icon: Heart, label: "モットー", value: "全力で楽しむ" },
+];
+
+const SectionHeader = ({ icon: Icon, title, linkTo, linkLabel }: { icon: any; title: string; linkTo?: string; linkLabel?: string }) => (
   <div className="flex items-center justify-between mb-6">
-    <h2 className="flex items-center gap-2 font-display font-bold text-xl text-foreground">
+    <h2 className="flex items-center gap-2 font-display font-bold text-lg sm:text-xl text-foreground">
       <Icon size={20} className="text-primary" />
       {title}
     </h2>
-    <Link to={linkTo} className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1">
-      {linkLabel}<ArrowRight size={14} />
-    </Link>
+    {linkTo && linkLabel && (
+      <Link to={linkTo} className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1">
+        {linkLabel}<ArrowRight size={14} />
+      </Link>
+    )}
   </div>
 );
 
 const Index = () => (
   <div>
     {/* Hero */}
-    <section className="relative h-[60vh] min-h-[400px] overflow-hidden">
+    <section className="relative h-[85vh] min-h-[520px] max-h-[800px] overflow-hidden">
       <img src={heroImage} alt="フットサル部" className="absolute inset-0 w-full h-full object-cover" width={1920} height={1080} />
       <div className="absolute inset-0 bg-gradient-hero" />
-      <div className="relative container h-full flex flex-col justify-end pb-12">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
-          <span className="inline-block px-3 py-1 rounded-full bg-primary/20 text-primary-foreground text-xs font-semibold mb-4 backdrop-blur-sm border border-primary-foreground/20">
+      
+      {/* Decorative elements */}
+      <div className="absolute top-1/4 right-[10%] w-64 h-64 rounded-full bg-primary/10 blur-[100px] hidden md:block" />
+      <div className="absolute bottom-1/3 left-[5%] w-48 h-48 rounded-full bg-accent/10 blur-[80px] hidden md:block" />
+      
+      <div className="relative container h-full flex flex-col justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="max-w-2xl"
+        >
+          <motion.span
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="inline-block px-4 py-1.5 rounded-full bg-primary-foreground/10 text-primary-foreground text-xs font-semibold mb-6 backdrop-blur-md border border-primary-foreground/15"
+          >
             〇〇高校フットサル部
-          </span>
-          <h1 className="font-display font-black text-4xl md:text-6xl text-primary-foreground leading-tight max-w-2xl">
+          </motion.span>
+          
+          <h1 className="font-display font-black text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-primary-foreground leading-[0.95] tracking-tight">
             Play with
             <br />
-            <span className="text-primary-foreground/80">Passion.</span>
+            <span className="text-gradient-hero-accent">Passion.</span>
           </h1>
-          <p className="mt-4 text-primary-foreground/70 max-w-md text-sm md:text-base">
+          
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.6 }}
+            className="mt-6 text-primary-foreground/60 max-w-md text-sm sm:text-base leading-relaxed"
+          >
             仲間と共に成長し、全力でプレーする。
             <br />
             私たちのフットサル部へようこそ。
-          </p>
-          <div className="mt-6 flex gap-3">
-            <Button asChild className="bg-gradient-primary shadow-primary hover:opacity-90 transition-opacity">
+          </motion.p>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.5 }}
+            className="mt-8 flex flex-wrap gap-3"
+          >
+            <Button asChild size="lg" className="bg-gradient-primary shadow-primary hover:opacity-90 transition-opacity text-sm sm:text-base px-6 sm:px-8">
               <Link to="/schedule">日程を見る</Link>
             </Button>
-            <Button asChild variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
-              <Link to="/about">部活紹介</Link>
+            <Button asChild variant="outline" size="lg" className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 backdrop-blur-sm text-sm sm:text-base px-6 sm:px-8">
+              <a href="#about">部活紹介</a>
             </Button>
-          </div>
+          </motion.div>
         </motion.div>
       </div>
+
+      {/* Bottom fade */}
+      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent" />
     </section>
 
     {/* Today's schedule */}
-    <section className="container mt-12">
-      <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="bg-purple-subtle rounded-2xl p-6 md:p-8 border border-border">
+    <section className="container mt-8 sm:mt-12">
+      <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="bg-purple-subtle rounded-2xl p-4 sm:p-6 md:p-8 border border-border">
         <div className="flex items-center gap-2 mb-4">
           <CalendarDays size={20} className="text-primary" />
-          <h2 className="font-display font-bold text-xl text-foreground">今日の予定</h2>
-          <span className="ml-auto text-sm text-muted-foreground font-medium">
+          <h2 className="font-display font-bold text-lg sm:text-xl text-foreground">今日の予定</h2>
+          <span className="ml-auto text-xs sm:text-sm text-muted-foreground font-medium">
             {new Date(today).toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" })}
           </span>
         </div>
@@ -90,7 +129,7 @@ const Index = () => (
     </section>
 
     {/* Upcoming */}
-    <section className="container mt-16">
+    <section className="container mt-12 sm:mt-16">
       <SectionHeader icon={CalendarDays} title="直近の予定" linkTo="/schedule" linkLabel="すべての日程" />
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
         {upcomingEvents.map((event, i) => (
@@ -102,20 +141,20 @@ const Index = () => (
     </section>
 
     {/* News */}
-    <section className="container mt-16">
+    <section className="container mt-12 sm:mt-16">
       <SectionHeader icon={Bell} title="お知らせ" linkTo="/news" linkLabel="すべて見る" />
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
         {newsItems.slice(0, 3).map((item, i) => (
           <motion.div key={item.id} custom={i} variants={fadeUp}>
-            <Link to="/news" className="group flex items-start gap-4 p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
+            <Link to="/news" className="group flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
               <div className="flex-shrink-0">
-                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
+                <span className="inline-block px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
                   {item.category}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">{item.title}</p>
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{item.content}</p>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-1 hidden sm:block">{item.content}</p>
               </div>
               <span className="text-xs text-muted-foreground flex-shrink-0">{item.date.replace("2026-", "").replace("-", "/")}</span>
             </Link>
@@ -124,10 +163,79 @@ const Index = () => (
       </motion.div>
     </section>
 
+    {/* About section */}
+    <section id="about" className="container mt-16 sm:mt-24 scroll-mt-20">
+      <SectionHeader icon={Users} title="部活紹介" />
+      
+      <div className="grid md:grid-cols-2 gap-6 md:gap-10 items-center mb-10">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <img src={teamPhoto} alt="チーム写真" className="rounded-2xl w-full aspect-[4/3] object-cover shadow-primary" width={1280} height={854} />
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+        >
+          <h3 className="font-display font-bold text-xl sm:text-2xl text-foreground mb-4">〇〇高校フットサル部</h3>
+          <p className="text-muted-foreground text-sm sm:text-base leading-relaxed mb-3">
+            私たちは「全力で楽しむ」をモットーに、日々練習に励んでいます。フットサル未経験から始めた部員も多く、誰でも楽しめる環境を大切にしています。
+          </p>
+          <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
+            技術の向上だけでなく、チームワークやコミュニケーション力も磨きながら、大会での上位進出を目指して活動しています。
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-10">
+        {stats.map(({ icon: Icon, label, value }, i) => (
+          <motion.div
+            key={label}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.1 }}
+            className="text-center p-4 sm:p-6 rounded-xl border border-border bg-card"
+          >
+            <Icon size={22} className="mx-auto text-primary mb-2" />
+            <div className="font-display font-bold text-lg sm:text-xl text-foreground">{value}</div>
+            <div className="text-xs text-muted-foreground mt-1">{label}</div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Activities */}
+      <div className="grid sm:grid-cols-3 gap-3 sm:gap-4">
+        {[
+          { title: "練習", desc: "月・水・金・土の週4日、放課後に第一体育館で練習。基礎練習からゲーム形式まで。" },
+          { title: "大会", desc: "春季大会・秋季大会・新人戦など、年間を通じて各種大会に出場。" },
+          { title: "練習試合", desc: "近隣の高校と定期的に練習試合を行い、実戦経験を積んでいます。" },
+        ].map((item, i) => (
+          <motion.div
+            key={item.title}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.1 }}
+            className="p-4 sm:p-5 rounded-xl bg-purple-subtle border border-border"
+          >
+            <h4 className="font-display font-semibold text-foreground mb-1.5">{item.title}</h4>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
+          </motion.div>
+        ))}
+      </div>
+    </section>
+
     {/* Photo preview */}
-    <section className="container mt-16">
+    <section className="container mt-12 sm:mt-16">
       <SectionHeader icon={ImageIcon} title="フォトギャラリー" linkTo="/gallery" linkLabel="もっと見る" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
         {[trainingImg, matchImg, celebrationImg, teamPhoto].map((src, i) => (
           <motion.div
             key={i}
