@@ -3,10 +3,14 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import Index from "./pages/Index";
+import LoginPage from "./pages/LoginPage";
 import SchedulePage from "./pages/SchedulePage";
+import ScheduleAdjustPage from "./pages/ScheduleAdjustPage";
 import NewsPage from "./pages/NewsPage";
 import VideosPage from "./pages/VideosPage";
 import GalleryPage from "./pages/GalleryPage";
@@ -20,18 +24,24 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <SiteHeader />
-        <main className="min-h-screen">
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/schedule" element={<SchedulePage />} />
-            <Route path="/news" element={<NewsPage />} />
-            <Route path="/videos" element={<VideosPage />} />
-            <Route path="/gallery" element={<GalleryPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </main>
-        <SiteFooter />
+        <AuthProvider>
+          <SiteHeader />
+          <main className="min-h-screen">
+            <Routes>
+              {/* Public */}
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<LoginPage />} />
+              {/* Protected */}
+              <Route path="/schedule" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
+              <Route path="/adjust" element={<ProtectedRoute><ScheduleAdjustPage /></ProtectedRoute>} />
+              <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
+              <Route path="/videos" element={<ProtectedRoute><VideosPage /></ProtectedRoute>} />
+              <Route path="/gallery" element={<ProtectedRoute><GalleryPage /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </main>
+          <SiteFooter />
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

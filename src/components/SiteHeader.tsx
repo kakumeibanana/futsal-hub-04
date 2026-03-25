@@ -1,14 +1,13 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Menu, X, LogIn, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const publicLinks = [
-  { to: "/", label: "ホーム" },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
 
 const memberLinks = [
   { to: "/schedule", label: "日程" },
+  { to: "/adjust", label: "日程調整" },
   { to: "/news", label: "お知らせ" },
   { to: "/videos", label: "動画" },
   { to: "/gallery", label: "ギャラリー" },
@@ -17,13 +16,21 @@ const memberLinks = [
 const SiteHeader = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isLoggedIn, memberName, logout } = useAuth();
 
   const linkClass = (to: string) =>
-    `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
       location.pathname === to
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:text-foreground hover:bg-muted"
     }`;
+
+  const handleLogout = () => {
+    logout();
+    setMobileOpen(false);
+    navigate("/");
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
@@ -35,14 +42,32 @@ const SiteHeader = () => {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
-          {publicLinks.map((link) => (
-            <Link key={link.to} to={link.to} className={linkClass(link.to)}>{link.label}</Link>
-          ))}
+          <Link to="/" className={linkClass("/")}>ホーム</Link>
+          {isLoggedIn && (
+            <>
+              <span className="mx-1 w-px h-5 bg-border" />
+              {memberLinks.map((link) => (
+                <Link key={link.to} to={link.to} className={linkClass(link.to)}>{link.label}</Link>
+              ))}
+            </>
+          )}
           <span className="mx-1 w-px h-5 bg-border" />
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold mr-1">部員</span>
-          {memberLinks.map((link) => (
-            <Link key={link.to} to={link.to} className={linkClass(link.to)}>{link.label}</Link>
-          ))}
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{memberName}</span>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1.5 text-muted-foreground">
+                <LogOut size={14} />
+                ログアウト
+              </Button>
+            </div>
+          ) : (
+            <Link to="/login">
+              <Button variant="default" size="sm" className="gap-1.5">
+                <LogIn size={14} />
+                部員ログイン
+              </Button>
+            </Link>
+          )}
         </nav>
 
         {/* Mobile toggle */}
@@ -66,37 +91,48 @@ const SiteHeader = () => {
             className="md:hidden overflow-hidden border-t border-border bg-background"
           >
             <div className="container py-3 flex flex-col gap-1">
-              {publicLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  onClick={() => setMobileOpen(false)}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    location.pathname === link.to
-                      ? "bg-secondary text-secondary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <div className="px-4 pt-2 pb-1">
-                <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">部員向け</span>
+              <Link to="/" onClick={() => setMobileOpen(false)} className={linkClass("/")}>
+                ホーム
+              </Link>
+
+              {isLoggedIn && (
+                <>
+                  <div className="px-3 pt-3 pb-1">
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">部員向け</span>
+                  </div>
+                  {memberLinks.map((link) => (
+                    <Link
+                      key={link.to}
+                      to={link.to}
+                      onClick={() => setMobileOpen(false)}
+                      className={linkClass(link.to)}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </>
+              )}
+
+              <div className="border-t border-border mt-2 pt-2">
+                {isLoggedIn ? (
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    <LogOut size={14} />
+                    ログアウト（{memberName}）
+                  </button>
+                ) : (
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground"
+                  >
+                    <LogIn size={14} />
+                    部員ログイン
+                  </Link>
+                )}
               </div>
-              {memberLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  onClick={() => setMobileOpen(false)}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    location.pathname === link.to
-                      ? "bg-secondary text-secondary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
             </div>
           </motion.nav>
         )}
