@@ -10,7 +10,7 @@ interface AuthContextType extends AuthState {
   logout: () => void;
 }
 
-const TEAM_PASSWORD = "futsal2026";
+const TEAM_PASSWORD = "Futsal2026";
 const STORAGE_KEY = "futsal-auth";
 
 const AuthContext = createContext<AuthContextType | null>(null);
