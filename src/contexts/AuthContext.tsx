@@ -13,6 +13,10 @@ interface AuthContextType extends AuthState {
 const TEAM_PASSWORD = "Futsal2026";
 const STORAGE_KEY = "futsal-auth";
 
+// ⚽️ ここに部員の名簿（許可する名前）を登録します！
+// カンマ区切りで、何人でも追加できます。
+const VALID_MEMBERS = ["田中", "佐藤", "鈴木", "山田太郎", "マネージャー"]; 
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const useAuth = () => {
@@ -34,12 +38,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
   }, [auth]);
 
+  // 🔐 ログインの判定を厳しくしました
   const login = (name: string, password: string): boolean => {
-    if (password === TEAM_PASSWORD && name.trim().length > 0) {
-      setAuth({ isLoggedIn: true, memberName: name.trim() });
+    const trimmedName = name.trim(); // 名前の前後の空白を消す
+    
+    // パスワードが一致 ＆ 名簿(VALID_MEMBERS)に名前が含まれているかチェック！
+    if (password === TEAM_PASSWORD && VALID_MEMBERS.includes(trimmedName)) {
+      setAuth({ isLoggedIn: true, memberName: trimmedName });
       return true;
     }
-    return false;
+    return false; // どちらかが間違っていたら弾く
   };
 
   const logout = () => {

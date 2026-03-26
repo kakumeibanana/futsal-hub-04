@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Lock, User, ArrowRight, AlertCircle } from "lucide-react";
+// 👁️ Eye, EyeOff アイコンを追加しました
+import { Lock, User, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,9 @@ const LoginPage = () => {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  // 👁️ パスワードの表示/非表示を管理する状態を追加
+  const [showPassword, setShowPassword] = useState(false);
+  
   const { login, isLoggedIn } = useAuth();
   const navigate = useNavigate();
 
@@ -21,6 +25,7 @@ const LoginPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    
     if (!name.trim()) {
       setError("名前を入力してください");
       return;
@@ -29,11 +34,15 @@ const LoginPage = () => {
       setError("パスワードを入力してください");
       return;
     }
+    
+    // AuthContextのlogin機能を使う
     const ok = login(name, password);
+    
     if (ok) {
       navigate("/schedule", { replace: true });
     } else {
-      setError("パスワードが正しくありません");
+      // 📝 エラーメッセージを分かりやすく修正
+      setError("名前が登録されていないか、パスワードが間違っています。");
     }
   };
 
@@ -74,7 +83,7 @@ const LoginPage = () => {
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="あなたの名前"
+              placeholder="名前"
               className="h-11"
               autoComplete="name"
             />
@@ -85,14 +94,28 @@ const LoginPage = () => {
               <Lock size={14} className="text-muted-foreground" />
               パスワード
             </label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="チームパスワード"
-              className="h-11"
-              autoComplete="current-password"
-            />
+            {/* 👁️ パスワード入力欄にアイコンボタンを追加 */}
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => {
+                  // 🪄 半角英数字と記号以外（日本語など）が入力されたら、その瞬間に空っぽに置き換える魔法
+                  const cleanValue = e.target.value.replace(/[^\x20-\x7E]/g, '');
+                  setPassword(cleanValue);
+                }}
+                placeholder="チームパスワード"
+                className="h-11 pr-10"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {error && (

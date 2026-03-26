@@ -10,7 +10,10 @@ import matchImg from "@/assets/match-action.jpg";
 import celebrationImg from "@/assets/celebration.jpg";
 import teamPhoto from "@/assets/team-photo.jpg";
 
-const today = "2026-03-24";
+// パソコン/スマホから現在の日時を取得
+const d = new Date();
+// YYYY-MM-DD の形に自動で変換して today に入れる
+const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayEvents = scheduleEvents.filter((e) => e.date === today);
 const upcomingEvents = scheduleEvents.filter((e) => e.date >= today).slice(0, 5);
 
@@ -58,19 +61,11 @@ const Index = () => (
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="max-w-2xl"
         >
-          <motion.span
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="inline-block px-4 py-1.5 rounded-full bg-primary-foreground/10 text-primary-foreground text-xs font-semibold mb-6 backdrop-blur-md border border-primary-foreground/15"
-          >
-            〇〇高校フットサル部
-          </motion.span>
-          
+
           <h1 className="font-display font-black text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-primary-foreground leading-[0.95] tracking-tight">
-            Play with
+            TSUKUBA FUTSAL CLUB
             <br />
-            <span className="text-gradient-hero-accent">Passion.</span>
+            <span className="text-gradient-hero-accent">136 - 137</span>
           </h1>
           
           <motion.p
@@ -93,7 +88,7 @@ const Index = () => (
             <Button asChild size="lg" className="bg-gradient-primary shadow-primary hover:opacity-90 transition-opacity text-sm sm:text-base px-6 sm:px-8">
               <Link to="/schedule">日程を見る</Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 backdrop-blur-sm text-sm sm:text-base px-6 sm:px-8">
+            <Button asChild variant="outline" size="lg" className="font-bold border-primary-foreground/20 text-[hsl(270,60%,52%)] hover:bg-primary-foreground/10 backdrop-blur-sm text-sm sm:text-base px-6 sm:px-8">
               <a href="#about">部活紹介</a>
             </Button>
           </motion.div>
