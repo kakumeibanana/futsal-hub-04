@@ -1,21 +1,17 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { User, Session } from "@supabase/supabase-js";
 
-interface AuthState {
+interface AuthContextType {
   isLoggedIn: boolean;
+  user: User | null;
+  session: Session | null;
   memberName: string;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  signup: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
 }
-
-interface AuthContextType extends AuthState {
-  login: (name: string, password: string) => boolean;
-  logout: () => void;
-}
-
-const TEAM_PASSWORD = "Futsal2026";
-const STORAGE_KEY = "futsal-auth";
-
-// ⚽️ ここに部員の名簿（許可する名前）を登録します！
-// カンマ区切りで、何人でも追加できます。
-const VALID_MEMBERS = ["田中", "佐藤", "鈴木", "山田太郎", "マネージャー"]; 
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -26,37 +22,64 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [auth, setAuth] = useState<AuthState>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return { isLoggedIn: false, memberName: "" };
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
-  }, [auth]);
+    // Listen for auth changes FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
-  // 🔐 ログインの判定を厳しくしました
-  const login = (name: string, password: string): boolean => {
-    const trimmedName = name.trim(); // 名前の前後の空白を消す
-    
-    // パスワードが一致 ＆ 名簿(VALID_MEMBERS)に名前が含まれているかチェック！
-    if (password === TEAM_PASSWORD && VALID_MEMBERS.includes(trimmedName)) {
-      setAuth({ isLoggedIn: true, memberName: trimmedName });
-      return true;
-    }
-    return false; // どちらかが間違っていたら弾く
+    // Then check existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error: error ? error.message : null };
   };
 
-  const logout = () => {
-    setAuth({ isLoggedIn: false, memberName: "" });
-    localStorage.removeItem(STORAGE_KEY);
+  const signup = async (email: string, password: string, name: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { display_name: name },
+        emailRedirectTo: window.location.origin,
+      },
+    });
+    return { error: error ? error.message : null };
   };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const memberName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || "";
 
   return (
-    <AuthContext.Provider value={{ ...auth, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: !!session,
+        user,
+        session,
+        memberName,
+        loading,
+        login,
+        signup,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
