@@ -26,8 +26,8 @@ const SiteHeader = () => {
         : "text-muted-foreground hover:text-foreground hover:bg-muted"
     }`;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     setMobileOpen(false);
     navigate("/");
   };
