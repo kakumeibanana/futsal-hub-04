@@ -1,15 +1,16 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { User, Session } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
+
+const TEAM_EMAIL = "team@futsal.dummy";
+const MEMBER_NAME_KEY = "futsal_member_name";
 
 interface AuthContextType {
   isLoggedIn: boolean;
-  user: User | null;
   session: Session | null;
   memberName: string;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ error: string | null }>;
-  signup: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
+  login: (password: string, name: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
 }
 
@@ -22,63 +23,48 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [memberName, setMemberName] = useState(() => localStorage.getItem(MEMBER_NAME_KEY) || "");
 
   useEffect(() => {
-    // Listen for auth changes FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      setUser(session?.user ?? null);
       setLoading(false);
+      if (!session) {
+        localStorage.removeItem(MEMBER_NAME_KEY);
+        setMemberName("");
+      }
     });
 
-    // Then check existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error ? error.message : null };
-  };
-
-  const signup = async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
+  const login = async (password: string, name: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: TEAM_EMAIL,
       password,
-      options: {
-        data: { display_name: name },
-        emailRedirectTo: window.location.origin,
-      },
     });
-    return { error: error ? error.message : null };
+    if (error) return { error: "パスワードが間違っています" };
+    localStorage.setItem(MEMBER_NAME_KEY, name);
+    setMemberName(name);
+    return { error: null };
   };
 
   const logout = async () => {
+    localStorage.removeItem(MEMBER_NAME_KEY);
+    setMemberName("");
     await supabase.auth.signOut();
   };
 
-  const memberName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || "";
-
   return (
     <AuthContext.Provider
-      value={{
-        isLoggedIn: !!session,
-        user,
-        session,
-        memberName,
-        loading,
-        login,
-        signup,
-        logout,
-      }}
+      value={{ isLoggedIn: !!session, session, memberName, loading, login, logout }}
     >
       {children}
     </AuthContext.Provider>
