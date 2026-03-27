@@ -138,7 +138,7 @@ const Index = () => (
     </section>
 
     {/* News */}
-    <section className="container mt-12 sm:mt-16">
+    <section id="news" className="container mt-12 sm:mt-16 scroll-mt-20">
       <SectionHeader icon={Bell} title="お知らせ" linkTo="/news" linkLabel="すべて見る" />
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
         {publicNews.slice(0, 3).map((item, i) => (
