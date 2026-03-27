@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 
+// ✨ ここにロゴ画像をインポートする1行を追加！
+import futsalLogo from "@/assets/images/futsalclubnew.jpg";
+
 const memberLinks = [
   { to: "/schedule", label: "日程" },
   { to: "/adjust", label: "日程調整" },
@@ -36,7 +39,10 @@ const SiteHeader = () => {
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="container flex items-center justify-between h-14 sm:h-16">
         <Link to="/" className="flex items-center gap-2 font-display font-bold text-lg sm:text-xl tracking-tight">
-          <span className="bg-gradient-primary text-primary-foreground w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs sm:text-sm font-black">F</span>
+          {/* ✋ 元の「F」のspanタグだけを削除して、imgタグに置き換えます */}
+          <img src={futsalLogo} alt="Futsal Club Logo" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover" />
+          
+          {/* ✅ 隣のテキストはそのまま残します */}
           <span className="text-foreground">Tsukuba <span className="text-gradient-primary">Futsal Club</span></span>
         </Link>
 
