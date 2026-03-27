@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 
 // ✨ ここにロゴ画像をインポートする1行を追加！
-import futsalLogo from "@/assets/images/futsalclubnew.jpg";
+import futsalLogo from "@/assets/futsalclubnew.jpg";
 
 const memberLinks = [
   { to: "/schedule", label: "日程" },
