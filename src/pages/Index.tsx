@@ -14,8 +14,10 @@ import teamPhoto from "@/assets/team-photo.jpg";
 const d = new Date();
 // YYYY-MM-DD の形に自動で変換して today に入れる
 const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const todayEvents = scheduleEvents.filter((e) => e.date === today);
-const upcomingEvents = scheduleEvents.filter((e) => e.date >= today).slice(0, 5);
+const publicSchedule = scheduleEvents.filter((e) => e.type !== "practice");
+const todayEvents = publicSchedule.filter((e) => e.date === today);
+const upcomingEvents = publicSchedule.filter((e) => e.date >= today).slice(0, 5);
+const publicNews = newsItems.filter((n) => n.visibility === "public");
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
