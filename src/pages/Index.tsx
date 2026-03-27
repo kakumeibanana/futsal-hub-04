@@ -15,8 +15,8 @@ const d = new Date();
 // YYYY-MM-DD の形に自動で変換して today に入れる
 const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const publicSchedule = scheduleEvents.filter((e) => e.type !== "practice");
-const todayEvents = publicSchedule.filter((e) => e.date === today);
-const upcomingEvents = publicSchedule.filter((e) => e.date >= today).slice(0, 5);
+const todayEvents = scheduleEvents.filter((e) => e.date === today);
+const upcomingEvents = publicSchedule.filter((e) => e.date >= today);
 const publicNews = newsItems.filter((n) => n.visibility === "public");
 
 const fadeUp = {
@@ -127,7 +127,7 @@ const Index = () => (
 
     {/* Upcoming */}
     <section className="container mt-12 sm:mt-16">
-      <SectionHeader icon={CalendarDays} title="直近の予定" linkTo="/schedule" linkLabel="すべての日程" />
+      <SectionHeader icon={CalendarDays} title="直近の予定" />
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
         {upcomingEvents.map((event, i) => (
           <motion.div key={event.id} custom={i} variants={fadeUp}>
@@ -143,7 +143,7 @@ const Index = () => (
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
         {publicNews.slice(0, 3).map((item, i) => (
           <motion.div key={item.id} custom={i} variants={fadeUp}>
-            <Link to="/news" className="group flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
+            <Link to={`/news/${item.id}`} className="group flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
               <div className="flex-shrink-0">
                 <span className="inline-block px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
                   {item.category}
