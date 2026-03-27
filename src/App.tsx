@@ -12,6 +12,7 @@ import LoginPage from "./pages/LoginPage";
 import SchedulePage from "./pages/SchedulePage";
 import ScheduleAdjustPage from "./pages/ScheduleAdjustPage";
 import NewsPage from "./pages/NewsPage";
+import NewsDetailPage from "./pages/NewsDetailPage";
 import VideosPage from "./pages/VideosPage";
 import GalleryPage from "./pages/GalleryPage";
 import NotFound from "./pages/NotFound";
