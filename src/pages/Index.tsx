@@ -88,7 +88,7 @@ const Index = () => (
             className="mt-8 flex flex-wrap gap-3"
           >
             <Button asChild size="lg" className="bg-gradient-primary shadow-primary hover:opacity-90 transition-opacity text-sm sm:text-base px-6 sm:px-8">
-              <Link to="/schedule">お知らせ</Link>
+              <a href="#news">お知らせ</a>
             </Button>
             <Button asChild variant="outline" size="lg" className="font-bold border-primary-foreground/20 text-[hsl(270,60%,52%)] hover:bg-primary-foreground/10 backdrop-blur-sm text-sm sm:text-base px-6 sm:px-8">
               <a href="#about">部活紹介</a>
@@ -138,7 +138,7 @@ const Index = () => (
     </section>
 
     {/* News */}
-    <section className="container mt-12 sm:mt-16">
+    <section id="news" className="container mt-12 sm:mt-16 scroll-mt-20">
       <SectionHeader icon={Bell} title="お知らせ" linkTo="/news" linkLabel="すべて見る" />
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
         {publicNews.slice(0, 3).map((item, i) => (
