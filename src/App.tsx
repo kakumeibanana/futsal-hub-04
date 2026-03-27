@@ -32,10 +32,11 @@ const App = () => (
               {/* Public */}
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/news" element={<NewsPage />} />
+              <Route path="/news/:id" element={<NewsDetailPage />} />
               {/* Protected */}
               <Route path="/schedule" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
               <Route path="/adjust" element={<ProtectedRoute><ScheduleAdjustPage /></ProtectedRoute>} />
-              <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
               <Route path="/videos" element={<ProtectedRoute><VideosPage /></ProtectedRoute>} />
               <Route path="/gallery" element={<ProtectedRoute><GalleryPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
