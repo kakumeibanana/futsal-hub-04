@@ -37,7 +37,7 @@ const SiteHeader = () => {
       <div className="container flex items-center justify-between h-14 sm:h-16">
         <Link to="/" className="flex items-center gap-2 font-display font-bold text-lg sm:text-xl tracking-tight">
           <span className="bg-gradient-primary text-primary-foreground w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs sm:text-sm font-black">F</span>
-          <span className="text-foreground">Futsal<span className="text-gradient-primary">Club</span></span>
+          <span className="text-foreground">Tsukuba <span className="text-gradient-primary">Futsal Club</span></span>
         </Link>
 
         {/* Desktop nav */}

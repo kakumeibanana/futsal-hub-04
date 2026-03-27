@@ -25,10 +25,10 @@ const fadeUp = {
 };
 
 const stats = [
-  { icon: Users, label: "部員数", value: "22名" },
-  { icon: Trophy, label: "創部", value: "2020年" },
-  { icon: Target, label: "活動日", value: "週4日" },
-  { icon: Heart, label: "モットー", value: "全力で楽しむ" },
+  { icon: Users, label: "部員数", value: "17名" },
+  { icon: Trophy, label: "創部", value: "1996年" },
+  { icon: Target, label: "活動日", value: "火、木、金、土" },
+  { icon: Heart, label: "モットー", value: "楽しく勝つ" },
 ];
 
 const SectionHeader = ({ icon: Icon, title, linkTo, linkLabel }: { icon: any; title: string; linkTo?: string; linkLabel?: string }) => (
@@ -76,9 +76,9 @@ const Index = () => (
             transition={{ delay: 0.5, duration: 0.6 }}
             className="mt-6 text-primary-foreground/60 max-w-md text-sm sm:text-base leading-relaxed"
           >
-            仲間と共に成長し、全力でプレーする。
+            楽しみながら勝ちを目指す、
             <br />
-            私たちのフットサル部へようこそ。
+            フットサル部へようこそ。
           </motion.p>
           
           <motion.div
@@ -88,7 +88,7 @@ const Index = () => (
             className="mt-8 flex flex-wrap gap-3"
           >
             <Button asChild size="lg" className="bg-gradient-primary shadow-primary hover:opacity-90 transition-opacity text-sm sm:text-base px-6 sm:px-8">
-              <Link to="/schedule">日程を見る</Link>
+              <Link to="/schedule">お知らせ</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="font-bold border-primary-foreground/20 text-[hsl(270,60%,52%)] hover:bg-primary-foreground/10 backdrop-blur-sm text-sm sm:text-base px-6 sm:px-8">
               <a href="#about">部活紹介</a>
@@ -179,12 +179,12 @@ const Index = () => (
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.15 }}
         >
-          <h3 className="font-display font-bold text-xl sm:text-2xl text-foreground mb-4">〇〇高校フットサル部</h3>
+          <h3 className="font-display font-bold text-xl sm:text-2xl text-foreground mb-4">筑波大学附属高等学校フットサル部</h3>
           <p className="text-muted-foreground text-sm sm:text-base leading-relaxed mb-3">
-            私たちは「全力で楽しむ」をモットーに、日々練習に励んでいます。フットサル未経験から始めた部員も多く、誰でも楽しめる環境を大切にしています。
+            私たちは、フットサルを楽しみながら勝つことを目標に活動しています。
           </p>
           <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
-            技術の向上だけでなく、チームワークやコミュニケーション力も磨きながら、大会での上位進出を目指して活動しています。
+            サッカー初心者もいれば、サッカーをしていたがブランクがある人もいて、幅広いレベルの部員が在籍しています。
           </p>
         </motion.div>
       </div>
@@ -210,9 +210,9 @@ const Index = () => (
       {/* Activities */}
       <div className="grid sm:grid-cols-3 gap-3 sm:gap-4">
         {[
-          { title: "練習", desc: "月・水・金・土の週4日、放課後に第一体育館で練習。基礎練習からゲーム形式まで。" },
-          { title: "大会", desc: "春季大会・秋季大会・新人戦など、年間を通じて各種大会に出場。" },
-          { title: "練習試合", desc: "近隣の高校と定期的に練習試合を行い、実戦経験を積んでいます。" },
+          { title: "練習", desc: "火・木・金・土の週4日、放課後に高校コート面で練習。基礎練習からゲーム形式まで。" },
+          { title: "大会", desc: "年間を通じて複数の大会に出場。2026年度には大会で東京都3位にランクイン。" },
+          { title: "練習試合", desc: "様々な高校と定期的に練習試合を行い、実戦経験を積んでいます。" },
         ].map((item, i) => (
           <motion.div
             key={item.title}
@@ -231,7 +231,7 @@ const Index = () => (
 
     {/* Photo preview */}
     <section className="container mt-12 sm:mt-16">
-      <SectionHeader icon={ImageIcon} title="フォトギャラリー" linkTo="/gallery" linkLabel="もっと見る" />
+      <SectionHeader icon={ImageIcon} title="フォトギャラリー"/>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
         {[trainingImg, matchImg, celebrationImg, teamPhoto].map((src, i) => (
           <motion.div

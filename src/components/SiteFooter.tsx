@@ -6,11 +6,11 @@ const SiteFooter = () => (
       <div className="flex flex-col sm:flex-row justify-between items-start gap-6 sm:gap-8">
         <div>
           <Link to="/" className="font-display font-bold text-lg tracking-tight">
-            <span className="text-foreground">Futsal</span>
-            <span className="text-gradient-primary">Club</span>
+            <span className="text-foreground">Tsukuba </span>
+            <span className="text-gradient-primary">Futsal Club</span>
           </Link>
           <p className="text-muted-foreground text-xs sm:text-sm mt-2 max-w-xs">
-            〇〇高校フットサル部の公式Webサイトです。
+            筑波大学附属高等学校フットサル部の公式Webサイトです。
           </p>
         </div>
         <div className="flex gap-8 sm:gap-10 text-sm">
@@ -24,7 +24,7 @@ const SiteFooter = () => (
         </div>
       </div>
       <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-border text-center text-xs text-muted-foreground">
-        © 2026 〇〇高校フットサル部. All rights reserved.
+        © 2026 筑波大学附属高等学校フットサル部. All rights reserved.
       </div>
     </div>
   </footer>
