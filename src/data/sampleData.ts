@@ -10,12 +10,15 @@ export interface ScheduleEvent {
   description?: string;
 }
 
+export type NewsVisibility = "public" | "member";
+
 export interface NewsItem {
   id: string;
   date: string;
   title: string;
   content: string;
   category: string;
+  visibility: NewsVisibility;
 }
 
 export const scheduleEvents: ScheduleEvent[] = [
