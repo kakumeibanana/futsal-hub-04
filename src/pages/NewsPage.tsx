@@ -21,6 +21,11 @@ const NewsPage = () => (
             <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
               {item.category}
             </span>
+            {item.visibility === "member" && (
+              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                部員限定
+              </span>
+            )}
             <span className="text-xs text-muted-foreground">{item.date.replace("2026-", "").replace("-", "/")}</span>
           </div>
           <h2 className="font-display font-semibold text-foreground mb-2">{item.title}</h2>
