@@ -127,7 +127,7 @@ const Index = () => (
 
     {/* Upcoming */}
     <section className="container mt-12 sm:mt-16">
-      <SectionHeader icon={CalendarDays} title="直近の予定" linkTo="/schedule" linkLabel="すべての日程" />
+      <SectionHeader icon={CalendarDays} title="直近の予定" />
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
         {upcomingEvents.map((event, i) => (
           <motion.div key={event.id} custom={i} variants={fadeUp}>
