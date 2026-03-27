@@ -143,7 +143,7 @@ const Index = () => (
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
         {publicNews.slice(0, 3).map((item, i) => (
           <motion.div key={item.id} custom={i} variants={fadeUp}>
-            <Link to="/news" className="group flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
+            <Link to={`/news/${item.id}`} className="group flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
               <div className="flex-shrink-0">
                 <span className="inline-block px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
                   {item.category}
