@@ -39,11 +39,14 @@ Deno.serve(async (req) => {
 
     const { id } = parsed.data;
 
+    // Normalize domain: strip protocol and trailing paths, keep just "xxx.microcms.io"
+    let domain = serviceDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
     let endpoint: string;
     if (id) {
-      endpoint = `https://${serviceDomain}/api/v1/news/${id}`;
+      endpoint = `https://${domain}/api/v1/news/${id}`;
     } else {
-      endpoint = `https://${serviceDomain}/api/v1/news?orders=-date&limit=50`;
+      endpoint = `https://${domain}/api/v1/news?orders=-date&limit=50`;
     }
 
     const response = await fetch(endpoint, {
