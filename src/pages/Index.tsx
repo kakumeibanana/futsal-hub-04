@@ -19,7 +19,7 @@ const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-$
 const publicSchedule = scheduleEvents.filter((e) => e.type !== "practice");
 const todayEvents = scheduleEvents.filter((e) => e.date === today);
 const upcomingEvents = publicSchedule.filter((e) => e.date >= today);
-const publicNews = newsItems.filter((n) => n.visibility === "public");
+
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
