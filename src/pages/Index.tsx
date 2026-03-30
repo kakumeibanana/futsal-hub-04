@@ -3,7 +3,9 @@ import { CalendarDays, ArrowRight, Bell, ImageIcon, Users, Trophy, Target, Heart
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import ScheduleCard from "@/components/ScheduleCard";
-import { scheduleEvents, newsItems } from "@/data/sampleData";
+import { scheduleEvents } from "@/data/sampleData";
+import { useNewsList } from "@/hooks/useNews";
+import { Skeleton } from "@/components/ui/skeleton";
 import heroImage from "@/assets/hero-futsal.jpg";
 import trainingImg from "@/assets/training.jpg";
 import matchImg from "@/assets/match-action.jpg";
@@ -17,7 +19,7 @@ const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-$
 const publicSchedule = scheduleEvents.filter((e) => e.type !== "practice");
 const todayEvents = scheduleEvents.filter((e) => e.date === today);
 const upcomingEvents = publicSchedule.filter((e) => e.date >= today);
-const publicNews = newsItems.filter((n) => n.visibility === "public");
+
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -45,7 +47,11 @@ const SectionHeader = ({ icon: Icon, title, linkTo, linkLabel }: { icon: any; ti
   </div>
 );
 
-const Index = () => (
+const Index = () => {
+  const { data: allNews = [], isLoading: newsLoading } = useNewsList();
+  const publicNews = allNews.filter((n) => n.visibility === "public");
+
+  return (
   <div>
     {/* Hero */}
     <section className="relative h-[85vh] min-h-[520px] max-h-[800px] overflow-hidden">
@@ -141,22 +147,28 @@ const Index = () => (
     <section id="news" className="container mt-12 sm:mt-16 scroll-mt-20">
       <SectionHeader icon={Bell} title="お知らせ" linkTo="/news" linkLabel="すべて見る" />
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
-        {publicNews.slice(0, 3).map((item, i) => (
-          <motion.div key={item.id} custom={i} variants={fadeUp}>
-            <Link to={`/news/${item.id}`} className="group flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
-              <div className="flex-shrink-0">
-                <span className="inline-block px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
-                  {item.category}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">{item.title}</p>
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-1 hidden sm:block">{item.content}</p>
-              </div>
-              <span className="text-xs text-muted-foreground flex-shrink-0">{item.date.replace("2026-", "").replace("-", "/")}</span>
-            </Link>
-          </motion.div>
-        ))}
+        {newsLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 rounded-xl" />
+          ))
+        ) : (
+          publicNews.slice(0, 3).map((item, i) => (
+            <motion.div key={item.id} custom={i} variants={fadeUp}>
+              <Link to={`/news/${item.id}`} className="group flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
+                <div className="flex-shrink-0">
+                  <span className="inline-block px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
+                    {item.category}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">{item.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1 hidden sm:block">{item.content}</p>
+                </div>
+                <span className="text-xs text-muted-foreground flex-shrink-0">{item.date.replace("2026-", "").replace("-", "/")}</span>
+              </Link>
+            </motion.div>
+          ))
+        )}
       </motion.div>
     </section>
 
@@ -248,6 +260,7 @@ const Index = () => (
       </div>
     </section>
   </div>
-);
+  );
+};
 
 export default Index;

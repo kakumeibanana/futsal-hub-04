@@ -2,20 +2,23 @@ import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { newsItems } from "@/data/sampleData";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNewsDetail } from "@/hooks/useNews";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const NewsDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isLoggedIn, loading } = useAuth();
+  const { isLoggedIn, loading: authLoading } = useAuth();
+  const { data: item, isLoading } = useNewsDetail(id);
 
-  const item = newsItems.find((n) => n.id === id);
-
-  if (loading) {
+  if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="container py-10 max-w-2xl">
+        <Skeleton className="h-8 w-32 mb-6" />
+        <Skeleton className="h-6 w-48 mb-4" />
+        <Skeleton className="h-10 w-full mb-6" />
+        <Skeleton className="h-40 w-full" />
       </div>
     );
   }
@@ -31,7 +34,6 @@ const NewsDetailPage = () => {
     );
   }
 
-  // Member-only news requires login
   if (item.visibility === "member" && !isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
@@ -73,10 +75,6 @@ const NewsDetailPage = () => {
 
         <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed space-y-4">
           <p>{item.content}</p>
-          <p>
-            これはお知らせの詳細ページです。今後、より詳細な内容がここに掲載される予定です。
-            チームに関する最新情報や重要な連絡事項を、このページで確認することができます。
-          </p>
         </div>
       </motion.article>
     </div>
