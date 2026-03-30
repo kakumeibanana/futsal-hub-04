@@ -3,7 +3,9 @@ import { CalendarDays, ArrowRight, Bell, ImageIcon, Users, Trophy, Target, Heart
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import ScheduleCard from "@/components/ScheduleCard";
-import { scheduleEvents, newsItems } from "@/data/sampleData";
+import { scheduleEvents } from "@/data/sampleData";
+import { useNewsList } from "@/hooks/useNews";
+import { Skeleton } from "@/components/ui/skeleton";
 import heroImage from "@/assets/hero-futsal.jpg";
 import trainingImg from "@/assets/training.jpg";
 import matchImg from "@/assets/match-action.jpg";
