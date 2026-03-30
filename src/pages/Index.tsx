@@ -47,7 +47,11 @@ const SectionHeader = ({ icon: Icon, title, linkTo, linkLabel }: { icon: any; ti
   </div>
 );
 
-const Index = () => (
+const Index = () => {
+  const { data: allNews = [], isLoading: newsLoading } = useNewsList();
+  const publicNews = allNews.filter((n) => n.visibility === "public");
+
+  return (
   <div>
     {/* Hero */}
     <section className="relative h-[85vh] min-h-[520px] max-h-[800px] overflow-hidden">
