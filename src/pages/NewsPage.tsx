@@ -1,11 +1,14 @@
 import { Link } from "react-router-dom";
-import { newsItems } from "@/data/sampleData";
 import { Bell } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNewsList } from "@/hooks/useNews";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const NewsPage = () => {
   const { isLoggedIn } = useAuth();
+  const { data: newsItems = [], isLoading } = useNewsList();
+
   const visibleNews = isLoggedIn
     ? newsItems
     : newsItems.filter((n) => n.visibility === "public");
@@ -17,33 +20,39 @@ const NewsPage = () => {
         お知らせ
       </h1>
       <div className="space-y-4 max-w-2xl">
-        {visibleNews.map((item, i) => (
-          <motion.article
-            key={item.id}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-          >
-            <Link
-              to={`/news/${item.id}`}
-              className="block p-5 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300"
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))
+        ) : (
+          visibleNews.map((item, i) => (
+            <motion.article
+              key={item.id}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
             >
-              <div className="flex items-center gap-3 mb-2">
-                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
-                  {item.category}
-                </span>
-                {item.visibility === "member" && (
-                  <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
-                    部員限定
+              <Link
+                to={`/news/${item.id}`}
+                className="block p-5 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
+                    {item.category}
                   </span>
-                )}
-                <span className="text-xs text-muted-foreground">{item.date.replace("2026-", "").replace("-", "/")}</span>
-              </div>
-              <h2 className="font-display font-semibold text-foreground mb-2">{item.title}</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">{item.content}</p>
-            </Link>
-          </motion.article>
-        ))}
+                  {item.visibility === "member" && (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                      部員限定
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground">{item.date.replace("2026-", "").replace("-", "/")}</span>
+                </div>
+                <h2 className="font-display font-semibold text-foreground mb-2">{item.title}</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">{item.content}</p>
+              </Link>
+            </motion.article>
+          ))
+        )}
       </div>
     </div>
   );
