@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import type { NewsItem } from "@/data/sampleData";
 
 interface MicroCmsNewsItem {
@@ -16,6 +15,11 @@ interface MicroCmsListResponse {
   totalCount: number;
 }
 
+const BASE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/microcms-news`;
+const HEADERS = {
+  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+};
+
 function toNewsItem(item: MicroCmsNewsItem): NewsItem {
   return {
     id: item.id,
@@ -31,10 +35,10 @@ export function useNewsList() {
   return useQuery({
     queryKey: ["news"],
     queryFn: async (): Promise<NewsItem[]> => {
-      const { data, error } = await supabase.functions.invoke("microcms-news");
-      if (error) throw error;
-      const res = data as MicroCmsListResponse;
-      return (res.contents || []).map(toNewsItem);
+      const res = await fetch(BASE_URL, { headers: HEADERS });
+      if (!res.ok) throw new Error("Failed to fetch news");
+      const data = (await res.json()) as MicroCmsListResponse;
+      return (data.contents || []).map(toNewsItem);
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -45,18 +49,7 @@ export function useNewsDetail(id: string | undefined) {
     queryKey: ["news", id],
     queryFn: async (): Promise<NewsItem | null> => {
       if (!id) return null;
-      const { data, error } = await supabase.functions.invoke("microcms-news", {
-        body: undefined,
-        headers: undefined,
-      });
-      // Use list and find by id since invoke doesn't support query params easily
-      // Alternative: call via fetch directly
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/microcms-news?id=${id}`;
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-      });
+      const res = await fetch(`${BASE_URL}?id=${id}`, { headers: HEADERS });
       if (!res.ok) throw new Error("Failed to fetch news detail");
       const item = (await res.json()) as MicroCmsNewsItem;
       return toNewsItem(item);
