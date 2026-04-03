@@ -4,11 +4,16 @@ import type { Session } from "@supabase/supabase-js";
 
 const TEAM_EMAIL = "team@futsal.dummy";
 const MEMBER_NAME_KEY = "futsal_member_name";
+const MEMBER_ROLE_KEY = "futsal_member_role";
+
+type Role = "captain" | "staff" | "member" | null;
 
 interface AuthContextType {
   isLoggedIn: boolean;
   session: Session | null;
   memberName: string;
+  role: Role;
+  isStaff: boolean;
   loading: boolean;
   login: (password: string, name: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
@@ -26,6 +31,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [memberName, setMemberName] = useState(() => localStorage.getItem(MEMBER_NAME_KEY) || "");
+  const [role, setRole] = useState<Role>(() => (localStorage.getItem(MEMBER_ROLE_KEY) as Role) || null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -33,7 +39,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       if (!session) {
         localStorage.removeItem(MEMBER_NAME_KEY);
+        localStorage.removeItem(MEMBER_ROLE_KEY);
         setMemberName("");
+        setRole(null);
       }
     });
 
@@ -51,20 +59,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       password,
     });
     if (error) return { error: "パスワードが間違っています" };
-    localStorage.setItem(MEMBER_NAME_KEY, name);
-    setMemberName(name);
+
+    // membersテーブルと照合
+    const { data: member } = await supabase
+      .from("members")
+      .select("role")
+      .eq("name", name.trim())
+      .single();
+
+    if (!member) {
+      await supabase.auth.signOut();
+      return { error: "部員リストに登録されていない名前です" };
+    }
+
+    const memberRole = member.role as Role;
+    localStorage.setItem(MEMBER_NAME_KEY, name.trim());
+    localStorage.setItem(MEMBER_ROLE_KEY, memberRole ?? "member");
+    setMemberName(name.trim());
+    setRole(memberRole);
     return { error: null };
   };
 
   const logout = async () => {
     localStorage.removeItem(MEMBER_NAME_KEY);
+    localStorage.removeItem(MEMBER_ROLE_KEY);
     setMemberName("");
+    setRole(null);
     await supabase.auth.signOut();
   };
 
+  const isStaff = role === "captain" || role === "staff";
+
   return (
     <AuthContext.Provider
-      value={{ isLoggedIn: !!session, session, memberName, loading, login, logout }}
+      value={{ isLoggedIn: !!session, session, memberName, role, isStaff, loading, login, logout }}
     >
       {children}
     </AuthContext.Provider>
