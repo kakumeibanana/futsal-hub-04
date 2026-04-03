@@ -44,6 +44,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          decide_count: number
           description: string | null
           id: string
           title: string
@@ -51,6 +52,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          decide_count?: number
           description?: string | null
           id?: string
           title: string
@@ -58,6 +60,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          decide_count?: number
           description?: string | null
           id?: string
           title?: string
