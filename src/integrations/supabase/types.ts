@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      comments: {
+        Row: {
+          content: string
+          created_at: string
+          event_id: string
+          id: string
+          member_name: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          event_id: string
+          id?: string
+          member_name: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          event_id?: string
+          id?: string
+          member_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_dates: {
         Row: {
           date: string
