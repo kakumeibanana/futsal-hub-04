@@ -15,6 +15,7 @@ interface Event {
   description: string | null;
   created_by: string;
   created_at: string;
+  decide_count: number;
 }
 
 interface EventDate {
@@ -120,6 +121,7 @@ const CreateEvent = ({
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [decideCount, setDecideCount] = useState(1);
   const [selectedSlots, setSelectedSlots] = useState<{ date: string; timeSlot: string | null }[]>([]);
   const [customSlot, setCustomSlot] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -156,7 +158,7 @@ const CreateEvent = ({
 
     const { data: event, error } = await supabase
       .from("events")
-      .insert({ title: title.trim(), description: description.trim() || null, created_by: memberName })
+      .insert({ title: title.trim(), description: description.trim() || null, created_by: memberName, decide_count: decideCount })
       .select()
       .single();
 
@@ -189,6 +191,32 @@ const CreateEvent = ({
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">メモ（任意）</label>
           <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="例: 場所は第一体育館" className="h-11" />
+        </div>
+        <div>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">決定候補数（上位N日を色付け）</label>
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-10 w-10"
+              onClick={() => setDecideCount((c) => Math.max(1, c - 1))}
+              disabled={decideCount <= 1}
+            >
+              <Minus size={16} />
+            </Button>
+            <span className="text-lg font-bold text-foreground w-8 text-center">{decideCount}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-10 w-10"
+              onClick={() => setDecideCount((c) => c + 1)}
+            >
+              <Plus size={16} />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">スコア上位{decideCount}位の日程列がハイライトされます</p>
         </div>
       </div>
 
@@ -269,6 +297,75 @@ const CreateEvent = ({
   );
 };
 
+// ── 集計テーブル ──────────────────────────────────────────
+const SummaryTable = ({
+  dates, responses, dateScores, topDates, memberNames,
+}: {
+  dates: EventDate[];
+  responses: Response[];
+  dateScores: { date: string; score: number }[];
+  topDates: Set<string>;
+  memberNames: string[];
+}) => (
+  <div className="mb-8">
+    <div className="text-sm font-semibold text-foreground mb-3">集計結果</div>
+    <div className="overflow-x-auto rounded-xl border border-border">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border bg-muted/50">
+            <th className="text-left px-3 py-2 font-medium text-muted-foreground sticky left-0 bg-muted/50">名前</th>
+            {dates.map((d) => (
+              <th
+                key={`${d.date}_${d.time_slot}`}
+                className={`px-3 py-2 font-medium text-center whitespace-nowrap ${
+                  topDates.has(d.date) ? "bg-primary/10 text-primary" : "text-muted-foreground"
+                }`}
+              >
+                {formatSlotLabel(d.date, d.time_slot)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {memberNames.map((name) => (
+            <tr key={name} className="border-b border-border last:border-0">
+              <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap sticky left-0 bg-background">{name}</td>
+              {dates.map((d) => {
+                const res = responses.find((r) => r.member_name === name && r.date === d.date);
+                const cfg = res ? statusConfig[res.availability as Availability] : null;
+                const isTop = topDates.has(d.date);
+                return (
+                  <td key={`${d.date}_${d.time_slot}`} className={`px-3 py-2 text-center ${isTop ? "bg-primary/5" : ""}`}>
+                    {cfg ? (
+                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold border ${cfg.className}`}>
+                        {cfg.label}
+                      </span>
+                    ) : <span className="text-muted-foreground">-</span>}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+          {/* スコア行 */}
+          <tr className="bg-muted/30">
+            <td className="px-3 py-2 font-semibold text-foreground text-sm sticky left-0 bg-muted/30">スコア</td>
+            {dateScores.map((ds) => {
+              const isTop = topDates.has(ds.date);
+              return (
+                <td key={ds.date} className={`px-3 py-2 text-center font-bold ${isTop ? "text-primary bg-primary/10" : "text-muted-foreground"}`}>
+                  {ds.score}
+                  {isTop && <span className="ml-0.5">★</span>}
+                </td>
+              );
+            })}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p className="text-xs text-muted-foreground mt-2">○=2点、△=1点で集計。★が候補日程</p>
+  </div>
+);
+
 // ── 回答・集計・コメント ──────────────────────────────────────────
 const EventDetail = ({
   event, memberName, isStaff, onBack, onDeleted,
@@ -301,7 +398,7 @@ const EventDetail = ({
 
       setDates((datesData ?? []) as EventDate[]);
       setResponses((responsesData ?? []) as Response[]);
-      setComments(commentsData ?? []);
+      setComments(commentsData as Comment[] ?? []);
 
       const mine: Record<string, Availability | null> = {};
       (responsesData ?? [])
@@ -358,7 +455,7 @@ const EventDetail = ({
     });
     const { data } = await supabase
       .from("comments").select("*").eq("event_id", event.id).order("created_at");
-    setComments(data ?? []);
+    setComments((data as Comment[]) ?? []);
     setNewComment("");
     setSendingComment(false);
   };
@@ -383,7 +480,12 @@ const EventDetail = ({
       .reduce((sum, r) => sum + (statusConfig[r.availability as Availability]?.score ?? 0), 0);
     return { date: d.date, score };
   });
-  const maxScore = Math.max(...dateScores.map((d) => d.score), 0);
+
+  // 上位N位の日程を算出（同点は全て含む）
+  const decideCount = event.decide_count ?? 1;
+  const uniqueScores = [...new Set(dateScores.map((d) => d.score))].filter((s) => s > 0).sort((a, b) => b - a);
+  const topNThreshold = uniqueScores.length >= decideCount ? uniqueScores[decideCount - 1] : 0;
+  const topDates = new Set(dateScores.filter((d) => d.score > 0 && d.score >= topNThreshold).map((d) => d.date));
 
   if (loading) return <div className="text-center py-16 text-muted-foreground">読み込み中...</div>;
 
@@ -401,61 +503,6 @@ const EventDetail = ({
         )}
       </div>
       {event.description && <p className="text-sm text-muted-foreground mb-6 ml-12">{event.description}</p>}
-
-      {/* 回答済みの場合：集計を先に表示 */}
-      {submitted && responses.length > 0 && (
-        <div className="mb-8">
-          <div className="text-sm font-semibold text-foreground mb-3">集計結果</div>
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground sticky left-0 bg-muted/50">名前</th>
-                  {dates.map((d) => (
-                    <th key={`${d.date}_${d.time_slot}`} className="px-3 py-2 font-medium text-muted-foreground text-center whitespace-nowrap">
-                      {formatSlotLabel(d.date, d.time_slot)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {memberNames.map((name) => (
-                  <tr key={name} className="border-b border-border last:border-0">
-                    <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap sticky left-0 bg-background">{name}</td>
-                    {dates.map((d) => {
-                      const res = responses.find((r) => r.member_name === name && r.date === d.date);
-                      const cfg = res ? statusConfig[res.availability as Availability] : null;
-                      return (
-                        <td key={`${d.date}_${d.time_slot}`} className="px-3 py-2 text-center">
-                          {cfg ? (
-                            <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold border ${cfg.className}`}>
-                              {cfg.label}
-                            </span>
-                          ) : <span className="text-muted-foreground">-</span>}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-                {/* スコア行 */}
-                <tr className="bg-muted/30">
-                  <td className="px-3 py-2 font-semibold text-foreground text-sm sticky left-0 bg-muted/30">スコア</td>
-                  {dateScores.map((ds) => {
-                    const d = dates.find((d) => d.date === ds.date);
-                    return (
-                      <td key={ds.date} className={`px-3 py-2 text-center font-bold ${ds.score === maxScore && maxScore > 0 ? "text-primary" : "text-muted-foreground"}`}>
-                        {ds.score}
-                        {ds.score === maxScore && maxScore > 0 && <span className="ml-0.5">★</span>}
-                      </td>
-                    );
-                  })}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">○=2点、△=1点で集計。★が最有力日程</p>
-        </div>
-      )}
 
       {/* 回答エリア */}
       <div className={`mb-8 ${submitted ? "p-4 rounded-xl border border-border bg-muted/20" : ""}`}>
@@ -502,57 +549,18 @@ const EventDetail = ({
         </div>
       </div>
 
-      {/* 未回答の場合の集計 */}
-      {!submitted && responses.length > 0 && (
-        <div className="mb-8">
-          <div className="text-sm font-semibold text-foreground mb-3">集計結果</div>
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">名前</th>
-                  {dates.map((d) => (
-                    <th key={`${d.date}_${d.time_slot}`} className="px-3 py-2 font-medium text-muted-foreground text-center whitespace-nowrap">
-                      {formatSlotLabel(d.date, d.time_slot)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {memberNames.map((name) => (
-                  <tr key={name} className="border-b border-border last:border-0">
-                    <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{name}</td>
-                    {dates.map((d) => {
-                      const res = responses.find((r) => r.member_name === name && r.date === d.date);
-                      const cfg = res ? statusConfig[res.availability as Availability] : null;
-                      return (
-                        <td key={`${d.date}_${d.time_slot}`} className="px-3 py-2 text-center">
-                          {cfg ? (
-                            <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold border ${cfg.className}`}>
-                              {cfg.label}
-                            </span>
-                          ) : <span className="text-muted-foreground">-</span>}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-                <tr className="bg-muted/30">
-                  <td className="px-3 py-2 font-semibold text-foreground text-sm">スコア</td>
-                  {dateScores.map((ds) => (
-                    <td key={ds.date} className={`px-3 py-2 text-center font-bold ${ds.score === maxScore && maxScore > 0 ? "text-primary" : "text-muted-foreground"}`}>
-                      {ds.score}{ds.score === maxScore && maxScore > 0 && "★"}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">○=2点、△=1点で集計。★が最有力日程</p>
-        </div>
+      {/* 集計テーブル */}
+      {responses.length > 0 && (
+        <SummaryTable
+          dates={dates}
+          responses={responses}
+          dateScores={dateScores}
+          topDates={topDates}
+          memberNames={memberNames}
+        />
       )}
 
-      {/* コメント */}
+      {/* コメント（集計テーブルの下） */}
       <div>
         <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
           <MessageCircle size={16} className="text-primary" />
@@ -607,7 +615,7 @@ const ScheduleAdjustPage = () => {
 
   const loadEvents = async () => {
     const { data } = await supabase.from("events").select("*").order("created_at", { ascending: false });
-    setEvents(data ?? []);
+    setEvents((data as Event[]) ?? []);
   };
 
   useEffect(() => { loadEvents(); }, []);

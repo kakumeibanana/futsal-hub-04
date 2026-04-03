@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      comments: {
+        Row: {
+          content: string
+          created_at: string
+          event_id: string
+          id: string
+          member_name: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          event_id: string
+          id?: string
+          member_name: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          event_id?: string
+          id?: string
+          member_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_dates: {
         Row: {
           date: string
@@ -44,6 +76,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          decide_count: number
           description: string | null
           id: string
           title: string
@@ -51,6 +84,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          decide_count?: number
           description?: string | null
           id?: string
           title: string
@@ -58,43 +92,12 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          decide_count?: number
           description?: string | null
           id?: string
           title?: string
         }
         Relationships: []
-      }
-      comments: {
-        Row: {
-          id: string
-          event_id: string
-          member_name: string
-          content: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          event_id: string
-          member_name: string
-          content: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          event_id?: string
-          member_name?: string
-          content?: string
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comments_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          }
-        ]
       }
       members: {
         Row: {

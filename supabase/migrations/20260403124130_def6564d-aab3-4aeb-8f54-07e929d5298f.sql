@@ -1,0 +1,1 @@
+ALTER TABLE public.events ADD COLUMN decide_count integer NOT NULL DEFAULT 1;
