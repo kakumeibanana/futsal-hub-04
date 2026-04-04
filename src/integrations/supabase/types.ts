@@ -101,22 +101,34 @@ export type Database = {
       }
       members: {
         Row: {
-          created_at: string
           id: string
           name: string
           role: string
+          display_role: string | null
+          number: number | null
+          positions: string[] | null
+          photo_url: string | null
+          created_at: string
         }
         Insert: {
-          created_at?: string
           id?: string
           name: string
           role?: string
+          display_role?: string | null
+          number?: number | null
+          positions?: string[] | null
+          photo_url?: string | null
+          created_at?: string
         }
         Update: {
-          created_at?: string
           id?: string
           name?: string
           role?: string
+          display_role?: string | null
+          number?: number | null
+          positions?: string[] | null
+          photo_url?: string | null
+          created_at?: string
         }
         Relationships: []
       }

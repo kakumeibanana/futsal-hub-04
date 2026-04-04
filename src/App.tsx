@@ -16,6 +16,7 @@ import NewsDetailPage from "./pages/NewsDetailPage";
 import VideosPage from "./pages/VideosPage";
 import GalleryPage from "./pages/GalleryPage";
 import NotFound from "./pages/NotFound";
+import MembersPage from "./pages/MembersPage";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
               <Route path="/adjust" element={<ProtectedRoute><ScheduleAdjustPage /></ProtectedRoute>} />
               <Route path="/videos" element={<ProtectedRoute><VideosPage /></ProtectedRoute>} />
               <Route path="/gallery" element={<ProtectedRoute><GalleryPage /></ProtectedRoute>} />
+              <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
