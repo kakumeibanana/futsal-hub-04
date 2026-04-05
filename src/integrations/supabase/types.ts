@@ -103,6 +103,7 @@ export type Database = {
         Row: {
           id: string
           name: string
+          name_roman: string | null
           role: string
           display_role: string | null
           number: number | null
@@ -113,6 +114,7 @@ export type Database = {
         Insert: {
           id?: string
           name: string
+          name_roman?: string | null
           role?: string
           display_role?: string | null
           number?: number | null
@@ -123,6 +125,7 @@ export type Database = {
         Update: {
           id?: string
           name?: string
+          name_roman?: string | null
           role?: string
           display_role?: string | null
           number?: number | null
