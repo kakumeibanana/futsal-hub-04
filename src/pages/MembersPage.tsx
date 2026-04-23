@@ -10,10 +10,33 @@ import { supabase } from "@/integrations/supabase/client";
 const POSITIONS = ["ゴレイロ", "フィクソ", "右アラ", "左アラ", "ピヴォ"];
 const DISPLAY_ROLES = [
   { value: "none", label: "なし" },
-  { value: "captain", label: "キャプテン" },
-  { value: "vice_captain", label: "副キャプテン" },
+  { value: "captain", label: "主将" },
+  { value: "vice_captain", label: "副主将" },
   { value: "club_leader", label: "クラブ長" },
+  { value: "treasurer", label: "会計" },
 ];
+
+const DISPLAY_ROLE_ORDER = ["captain", "vice_captain", "club_leader", "treasurer", "none"];
+const POSITION_ORDER = ["ピヴォ", "右アラ", "左アラ", "フィクソ", "ゴレイロ"];
+
+const sortMembers = (list: Member[]) =>
+  [...list].sort((a, b) => {
+    const aRole = a.display_role ?? "none";
+    const bRole = b.display_role ?? "none";
+    const aRoleIdx = DISPLAY_ROLE_ORDER.indexOf(aRole === "none" || !aRole ? "none" : aRole);
+    const bRoleIdx = DISPLAY_ROLE_ORDER.indexOf(bRole === "none" || !bRole ? "none" : bRole);
+    if (aRoleIdx !== bRoleIdx) return aRoleIdx - bRoleIdx;
+
+    const aBestPos = Math.min(...(a.positions ?? []).map((p) => {
+      const i = POSITION_ORDER.indexOf(p);
+      return i === -1 ? 999 : i;
+    }).concat(999));
+    const bBestPos = Math.min(...(b.positions ?? []).map((p) => {
+      const i = POSITION_ORDER.indexOf(p);
+      return i === -1 ? 999 : i;
+    }).concat(999));
+    return aBestPos - bBestPos;
+  });
 const SYSTEM_ROLES = [
   { value: "member", label: "一般" },
   { value: "staff", label: "幹部" },
@@ -33,9 +56,10 @@ interface Member {
 
 // 役職タグのデザイン設定（手書きワイヤーベース）
 const displayRoleConfig = {
-  captain:      { label: "C",  bg: "bg-amber-400", text: "text-black" },
-  vice_captain: { label: "VC", bg: "bg-blue-600",  text: "text-white" },
+  captain:      { label: "C",  bg: "bg-amber-400",  text: "text-black" },
+  vice_captain: { label: "VC", bg: "bg-blue-600",   text: "text-white" },
   club_leader:  { label: "CL", bg: "bg-purple-700", text: "text-white" },
+  treasurer:    { label: "会計", bg: "bg-green-600", text: "text-white" },
 };
 
 // ── メンバーカード（新・2列＆背番号フォントデザイン）──────────────────
@@ -257,11 +281,8 @@ const MembersPage = () => {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
 
   const loadMembers = async () => {
-    const { data } = await supabase
-      .from("members")
-      .select("*")
-      .order("number", { ascending: true, nullsFirst: false });
-    setMembers((data ?? []) as Member[]);
+    const { data } = await supabase.from("members").select("*");
+    setMembers(sortMembers((data ?? []) as Member[]));
     setLoading(false);
   };
 
