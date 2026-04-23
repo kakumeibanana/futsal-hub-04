@@ -59,7 +59,7 @@ const displayRoleConfig = {
   captain:      { label: "C",  bg: "bg-amber-400",  text: "text-black" },
   vice_captain: { label: "VC", bg: "bg-blue-600",   text: "text-white" },
   club_leader:  { label: "CL", bg: "bg-purple-700", text: "text-white" },
-  treasurer:    { label: "ac", bg: "bg-green-600", text: "text-white" },
+  treasurer:    { label: "AC", bg: "bg-green-600", text: "text-white" },
 };
 
 // ── メンバーカード（新・2列＆背番号フォントデザイン）──────────────────
