@@ -73,9 +73,10 @@ const NewsDetailPage = () => {
           {item.title}
         </h1>
 
-        <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed space-y-4">
-          <p>{item.content}</p>
-        </div>
+        <div
+          className="prose prose-sm max-w-none text-muted-foreground leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: item.content }}
+        />
       </motion.article>
     </div>
   );
