@@ -281,7 +281,7 @@ const MembersPage = () => {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
 
   const loadMembers = async () => {
-    const { data } = await supabase.from("members").select("*");
+    const { data } = await supabase.from("members").select("*").eq("hidden", false);
     setMembers(sortMembers((data ?? []) as Member[]));
     setLoading(false);
   };
