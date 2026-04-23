@@ -13,6 +13,7 @@ import trainingImg from "@/assets/training.jpg";
 import matchImg from "@/assets/match-action.jpg";
 import celebrationImg from "@/assets/celebration.jpg";
 import teamPhoto from "@/assets/team-photo.jpg";
+import gasshukuImg from "@/assets/フットサル部合宿.jpeg";
 
 const FALLBACK_GALLERY = [trainingImg, matchImg, celebrationImg, teamPhoto];
 
@@ -193,7 +194,7 @@ const Index = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          <img src={teamPhoto} alt="チーム写真" className="rounded-2xl w-full aspect-[4/3] object-cover shadow-primary" width={1280} height={854} />
+          <img src={gasshukuImg} alt="合宿写真" className="rounded-2xl w-full aspect-[4/3] object-cover shadow-primary" />
         </motion.div>
         <motion.div
           initial={{ opacity: 0, x: 20 }}
