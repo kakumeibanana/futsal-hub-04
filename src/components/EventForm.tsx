@@ -4,25 +4,38 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
+interface InitialValues {
+  title?: string;
+  date?: string;
+  isAllDay?: boolean;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
+  type?: "match" | "practice" | "event";
+  detail?: string;
+  belongings?: string;
+}
+
 interface EventFormProps {
   onClose: () => void;
   onSaved: () => void;
+  initialValues?: InitialValues;
 }
 
-const EventForm = ({ onClose, onSaved }: EventFormProps) => {
+const EventForm = ({ onClose, onSaved, initialValues }: EventFormProps) => {
   const { memberName } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
-  const [isAllDay, setIsAllDay] = useState(false);
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [location, setLocation] = useState("");
-  const [type, setType] = useState<"match" | "practice" | "event">("practice");
-  const [detail, setDetail] = useState("");
-  const [belongings, setBelongings] = useState("");
+  const [title, setTitle] = useState(initialValues?.title ?? "");
+  const [date, setDate] = useState(initialValues?.date ?? "");
+  const [isAllDay, setIsAllDay] = useState(initialValues?.isAllDay ?? false);
+  const [startTime, setStartTime] = useState(initialValues?.startTime ?? "");
+  const [endTime, setEndTime] = useState(initialValues?.endTime ?? "");
+  const [location, setLocation] = useState(initialValues?.location ?? "");
+  const [type, setType] = useState<"match" | "practice" | "event">(initialValues?.type ?? "practice");
+  const [detail, setDetail] = useState(initialValues?.detail ?? "");
+  const [belongings, setBelongings] = useState(initialValues?.belongings ?? "");
   const [lineNotify, setLineNotify] = useState<"none" | "immediate" | "scheduled">("none");
   const [lineSendAt, setLineSendAt] = useState("");
 

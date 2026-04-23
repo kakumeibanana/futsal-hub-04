@@ -39,6 +39,7 @@ const SchedulePage = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedEvent, setSelectedEvent] = useState<MappedEvent | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [duplicateValues, setDuplicateValues] = useState<MappedEvent | null>(null);
 
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
@@ -215,12 +216,26 @@ const SchedulePage = () => {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl overflow-hidden border border-border"
             >
-              <button
-                onClick={() => setSelectedEvent(null)}
-                className="absolute top-4 right-4 p-2 bg-muted/50 hover:bg-muted text-muted-foreground rounded-full transition-colors z-10"
-              >
-                <X size={20} />
-              </button>
+              <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+                {isStaff && (
+                  <button
+                    onClick={() => {
+                      setDuplicateValues(selectedEvent);
+                      setSelectedEvent(null);
+                      setShowForm(true);
+                    }}
+                    className="px-3 py-1.5 bg-muted/80 hover:bg-muted text-muted-foreground rounded-full text-xs font-semibold transition-colors"
+                  >
+                    複製
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="p-2 bg-muted/50 hover:bg-muted text-muted-foreground rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
               <div className="p-6 sm:p-8">
                 <div className="mb-4 inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
@@ -278,11 +293,22 @@ const SchedulePage = () => {
       <AnimatePresence>
         {showForm && (
           <EventForm
-            onClose={() => setShowForm(false)}
+            onClose={() => { setShowForm(false); setDuplicateValues(null); }}
             onSaved={() => {
               setShowForm(false);
+              setDuplicateValues(null);
               fetchSchedules();
             }}
+            initialValues={duplicateValues ? {
+              title: duplicateValues.title,
+              isAllDay: duplicateValues.time === "終日",
+              startTime: duplicateValues.time !== "終日" ? duplicateValues.time.split(" - ")[0] : "",
+              endTime: duplicateValues.time !== "終日" ? duplicateValues.time.split(" - ")[1] ?? "" : "",
+              location: duplicateValues.location,
+              type: duplicateValues.type,
+              detail: duplicateValues.detail,
+              belongings: duplicateValues.belongings,
+            } : undefined}
           />
         )}
       </AnimatePresence>

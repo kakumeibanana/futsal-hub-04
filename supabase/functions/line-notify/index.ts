@@ -41,10 +41,12 @@ function buildMessage(event: ScheduleEvent): string {
   if (!event.is_all_day && event.start_time) {
     const start = event.start_time.slice(0, 5);
     const end = event.end_time ? event.end_time.slice(0, 5) : "";
-    timeStr = end ? `\n🕐 ${start} - ${end}` : `\n🕐 ${start}~`;
+    timeStr = end ? `\n${start} - ${end}` : `\n${start}~`;
   }
 
-  return `${header}\n${dateStr}${timeStr}\n@${location}\n\n★${event.title}\n\n★詳細・時程\n${detail}\n\n★持ち物\n${belongings}`;
+  const titleLine = event.type !== "practice" ? `\n\n★${event.title}` : "";
+
+  return `${header}\n${dateStr}${timeStr}\n@${location}${titleLine}\n\n★詳細・時程\n${detail}\n\n★持ち物\n${belongings}`;
 }
 
 async function sendLineMessage(text: string): Promise<void> {
