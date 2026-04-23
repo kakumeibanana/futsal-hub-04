@@ -282,7 +282,8 @@ const MembersPage = () => {
 
   const loadMembers = async () => {
     const { data } = await supabase.from("members").select("*").eq("hidden", false);
-    setMembers(sortMembers((data ?? []) as Member[]));
+    const visible = (data ?? []).filter((m: any) => !m.hidden) as Member[];
+    setMembers(sortMembers(visible));
     setLoading(false);
   };
 
