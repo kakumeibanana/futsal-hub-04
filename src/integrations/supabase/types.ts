@@ -106,6 +106,7 @@ export type Database = {
         Row: {
           created_at: string | null
           display_role: string | null
+          hidden: boolean
           id: string
           name: string
           name_roman: string | null
@@ -117,6 +118,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           display_role?: string | null
+          hidden?: boolean
           id?: string
           name: string
           name_roman?: string | null
@@ -128,6 +130,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           display_role?: string | null
+          hidden?: boolean
           id?: string
           name?: string
           name_roman?: string | null
