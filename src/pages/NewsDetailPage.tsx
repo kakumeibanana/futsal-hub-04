@@ -74,7 +74,7 @@ const NewsDetailPage = () => {
         </h1>
 
         <div
-          className="prose prose-sm max-w-none text-muted-foreground leading-relaxed"
+          className="prose prose-sm max-w-none text-muted-foreground leading-relaxed [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-4"
           dangerouslySetInnerHTML={{ __html: item.content }}
         />
       </motion.article>
