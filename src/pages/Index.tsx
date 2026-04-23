@@ -6,11 +6,15 @@ import ScheduleCard from "@/components/ScheduleCard";
 import { scheduleEvents } from "@/data/sampleData";
 import { useNewsList } from "@/hooks/useNews";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 import heroImage from "@/assets/hero-futsal.jpg";
 import trainingImg from "@/assets/training.jpg";
 import matchImg from "@/assets/match-action.jpg";
 import celebrationImg from "@/assets/celebration.jpg";
 import teamPhoto from "@/assets/team-photo.jpg";
+
+const FALLBACK_GALLERY = [trainingImg, matchImg, celebrationImg, teamPhoto];
 
 // パソコン/スマホから現在の日時を取得
 const d = new Date();
@@ -50,6 +54,12 @@ const SectionHeader = ({ icon: Icon, title, linkTo, linkLabel }: { icon: any; ti
 const Index = () => {
   const { data: allNews = [], isLoading: newsLoading } = useNewsList();
   const publicNews = allNews.filter((n) => n.visibility === "public");
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    supabase.from("gallery_images").select("url").order("created_at", { ascending: false }).limit(4)
+      .then(({ data }) => { if (data?.length) setGalleryImages(data.map((d) => d.url)); });
+  }, []);
 
   return (
   <div>
@@ -245,7 +255,7 @@ const Index = () => {
     <section className="container mt-12 sm:mt-16">
       <SectionHeader icon={ImageIcon} title="フォトギャラリー"/>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-        {[trainingImg, matchImg, celebrationImg, teamPhoto].map((src, i) => (
+        {(galleryImages.length > 0 ? galleryImages : FALLBACK_GALLERY).map((src, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, scale: 0.95 }}
