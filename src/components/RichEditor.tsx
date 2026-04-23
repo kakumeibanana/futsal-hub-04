@@ -37,6 +37,8 @@ const RichEditor = ({ content, onChange, placeholder }: RichEditorProps) => {
       const { data } = supabase.storage.from("news-images").getPublicUrl(path);
       editor.chain().focus().setImage({ src: data.publicUrl }).run();
       onChange(editor.getHTML());
+      // ギャラリーにも自動追加
+      await supabase.from("gallery_images").insert({ url: data.publicUrl });
     } catch (e) {
       console.error(e);
     } finally {
