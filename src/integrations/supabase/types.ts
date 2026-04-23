@@ -10,29 +10,29 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
       comments: {
         Row: {
           content: string
-          created_at: string
-          event_id: string
+          created_at: string | null
+          event_id: string | null
           id: string
           member_name: string
         }
         Insert: {
           content: string
-          created_at?: string
-          event_id: string
+          created_at?: string | null
+          event_id?: string | null
           id?: string
           member_name: string
         }
         Update: {
           content?: string
-          created_at?: string
-          event_id?: string
+          created_at?: string | null
+          event_id?: string | null
           id?: string
           member_name?: string
         }
@@ -49,18 +49,21 @@ export type Database = {
       event_dates: {
         Row: {
           date: string
-          event_id: string
+          event_id: string | null
           id: string
+          time_slot: string | null
         }
         Insert: {
           date: string
-          event_id: string
+          event_id?: string | null
           id?: string
+          time_slot?: string | null
         }
         Update: {
           date?: string
-          event_id?: string
+          event_id?: string | null
           id?: string
+          time_slot?: string | null
         }
         Relationships: [
           {
@@ -74,7 +77,7 @@ export type Database = {
       }
       events: {
         Row: {
-          created_at: string
+          created_at: string | null
           created_by: string
           decide_count: number
           description: string | null
@@ -82,7 +85,7 @@ export type Database = {
           title: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           created_by: string
           decide_count?: number
           description?: string | null
@@ -90,7 +93,7 @@ export type Database = {
           title: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           created_by?: string
           decide_count?: number
           description?: string | null
@@ -101,62 +104,62 @@ export type Database = {
       }
       members: {
         Row: {
+          created_at: string | null
+          display_role: string | null
           id: string
           name: string
           name_roman: string | null
-          role: string
-          display_role: string | null
           number: number | null
-          positions: string[] | null
           photo_url: string | null
-          created_at: string
+          positions: string[] | null
+          role: string
         }
         Insert: {
+          created_at?: string | null
+          display_role?: string | null
           id?: string
           name: string
           name_roman?: string | null
-          role?: string
-          display_role?: string | null
           number?: number | null
-          positions?: string[] | null
           photo_url?: string | null
-          created_at?: string
+          positions?: string[] | null
+          role?: string
         }
         Update: {
+          created_at?: string | null
+          display_role?: string | null
           id?: string
           name?: string
           name_roman?: string | null
-          role?: string
-          display_role?: string | null
           number?: number | null
-          positions?: string[] | null
           photo_url?: string | null
-          created_at?: string
+          positions?: string[] | null
+          role?: string
         }
         Relationships: []
       }
       responses: {
         Row: {
           availability: string
-          created_at: string
+          created_at: string | null
           date: string
-          event_id: string
+          event_id: string | null
           id: string
           member_name: string
         }
         Insert: {
           availability: string
-          created_at?: string
+          created_at?: string | null
           date: string
-          event_id: string
+          event_id?: string | null
           id?: string
           member_name: string
         }
         Update: {
           availability?: string
-          created_at?: string
+          created_at?: string | null
           date?: string
-          event_id?: string
+          event_id?: string | null
           id?: string
           member_name?: string
         }
@@ -169,6 +172,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      schedule_events: {
+        Row: {
+          belongings: string
+          created_at: string
+          created_by: string
+          date: string
+          detail: string
+          end_time: string | null
+          id: string
+          is_all_day: boolean
+          line_notify_type: string
+          line_send_at: string | null
+          line_sent: boolean
+          location: string
+          start_time: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          belongings?: string
+          created_at?: string
+          created_by?: string
+          date: string
+          detail?: string
+          end_time?: string | null
+          id?: string
+          is_all_day?: boolean
+          line_notify_type?: string
+          line_send_at?: string | null
+          line_sent?: boolean
+          location?: string
+          start_time?: string | null
+          title: string
+          type?: string
+        }
+        Update: {
+          belongings?: string
+          created_at?: string
+          created_by?: string
+          date?: string
+          detail?: string
+          end_time?: string | null
+          id?: string
+          is_all_day?: boolean
+          line_notify_type?: string
+          line_send_at?: string | null
+          line_sent?: boolean
+          location?: string
+          start_time?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: []
       }
     }
     Views: {

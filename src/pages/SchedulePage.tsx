@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import ScheduleCard from "@/components/ScheduleCard";
-import { 
-  CalendarDays, Loader2, AlertCircle, 
-  X, MapPin, Clock, Info, Briefcase 
+import EventForm from "@/components/EventForm";
+import {
+  CalendarDays, Loader2, AlertCircle,
+  X, MapPin, Clock, Info, Briefcase, Plus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type EventType = "match" | "practice" | "event";
 
@@ -16,8 +19,8 @@ export interface MappedEvent {
   time: string;
   location: string;
   type: EventType;
-  detail: string;       // 追加：詳細
-  belongings: string;   // 追加：持ち物
+  detail: string;
+  belongings: string;
 }
 
 const filterOptions: { value: EventType | "all"; label: string }[] = [
@@ -28,88 +31,89 @@ const filterOptions: { value: EventType | "all"; label: string }[] = [
 ];
 
 const SchedulePage = () => {
+  const { isStaff } = useAuth();
   const [events, setEvents] = useState<MappedEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [filter, setFilter] = useState<EventType | "all">("all");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  
-  // モーダル表示用のステートを追加
   const [selectedEvent, setSelectedEvent] = useState<MappedEvent | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const fetchSchedules = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error: fetchError } = await supabase
+        .from("schedule_events")
+        .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
+        .gte("date", today)
+        .order("date", { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      const mapped: MappedEvent[] = (data ?? []).map((row) => {
+        let time = "終日";
+        if (!row.is_all_day && row.start_time) {
+          const start = (row.start_time as string).slice(0, 5);
+          const end = row.end_time ? (row.end_time as string).slice(0, 5) : "";
+          time = end ? `${start} - ${end}` : `${start}~`;
+        }
+        return {
+          id: row.id,
+          title: row.title,
+          date: row.date,
+          time,
+          location: row.location,
+          type: row.type as EventType,
+          detail: row.detail,
+          belongings: row.belongings,
+        };
+      });
+
+      setEvents(mapped);
+    } catch (err: any) {
+      setError(err.message || "スケジュールの読み込みに失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchSchedules = async () => {
-      try {
-        const response = await fetch("https://script.google.com/macros/s/AKfycbyIhmMlNo6H4rD0so6nYnGfVWptl4LTjV86UPlSB-fhSF0j_Q9JasRve30oorczsl0dcg/exec");
-        if (!response.ok) throw new Error("データの取得に失敗しました");
-        const data = await response.json();
-        
-        if (data.error) throw new Error(data.error);
-
-        const mappedData = data.map((d: any, i: number): MappedEvent => {
-          let type: EventType = "event";
-          if (d.title.includes("試合") || d.title.includes("大会") || d.title.includes("リーグ")) {
-            type = "match";
-          } else if (d.title.includes("練習") || d.title.includes("トレ")) {
-            type = "practice";
-          }
-
-          const startDate = new Date(d.startTime);
-          const endDate = new Date(d.endTime);
-          
-          const dateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
-
-          let timeStr = "終日";
-          if (!d.isAllDayEvent) {
-            const formatTime = (date: Date) => date.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
-            timeStr = `${formatTime(startDate)} - ${formatTime(endDate)}`;
-          }
-
-          return {
-            id: `gas-event-${i}`,
-            title: d.title || "予定なし",
-            date: dateStr,
-            time: timeStr,
-            location: d.location || "",
-            type: type,
-            detail: d.detail || "",             // 新しいGASから取得
-            belongings: d.belongings || ""      // 新しいGASから取得
-          };
-        });
-
-        setEvents(mappedData);
-      } catch (err: any) {
-        setError(err.message || "スケジュールの読み込み中にエラーが発生しました。");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchSchedules();
-  }, []);
+  }, [fetchSchedules]);
 
   const filtered = events.filter((e) => {
     if (filter !== "all" && e.type !== filter) return false;
     if (selectedDate) {
       const selYear = selectedDate.getFullYear();
-      const selMonth = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const selDay = String(selectedDate.getDate()).padStart(2, '0');
-      const selDateStr = `${selYear}-${selMonth}-${selDay}`;
-      
-      if (e.date !== selDateStr) return false;
+      const selMonth = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const selDay = String(selectedDate.getDate()).padStart(2, "0");
+      if (e.date !== `${selYear}-${selMonth}-${selDay}`) return false;
     }
     return true;
   });
 
-  const eventDates = events.map((e) => new Date(e.date));
+  const eventDates = events.map((e) => new Date(e.date + "T12:00:00"));
 
   return (
     <div className="container py-10 relative">
-      <h1 className="font-display font-bold text-3xl text-foreground flex items-center gap-2 mb-8">
-        <CalendarDays size={28} className="text-primary" />
-        日程
-      </h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="font-display font-bold text-3xl text-foreground flex items-center gap-2">
+          <CalendarDays size={28} className="text-primary" />
+          日程
+        </h1>
+        {isStaff && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={16} />
+            イベントを追加
+          </button>
+        )}
+      </div>
 
       <div className="grid md:grid-cols-[300px_1fr] gap-8">
         {/* Sidebar */}
@@ -124,13 +128,15 @@ const SchedulePage = () => {
               className="pointer-events-auto"
             />
             {selectedDate && (
-              <button onClick={() => setSelectedDate(undefined)} className="mt-2 text-xs text-primary hover:underline w-full text-center">
+              <button
+                onClick={() => setSelectedDate(undefined)}
+                className="mt-2 text-xs text-primary hover:underline w-full text-center"
+              >
                 日付の選択を解除
               </button>
             )}
           </div>
 
-          {/* Filters */}
           <div className="rounded-xl border border-border bg-card p-4">
             <h3 className="font-display font-semibold text-sm mb-3 text-foreground">フィルター</h3>
             <div className="flex flex-wrap gap-2">
@@ -156,7 +162,7 @@ const SchedulePage = () => {
           {loading && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Loader2 size={32} className="animate-spin text-primary mb-4" />
-              <p className="text-sm">Googleカレンダーから予定を取得中...</p>
+              <p className="text-sm">スケジュールを取得中...</p>
             </div>
           )}
 
@@ -170,15 +176,14 @@ const SchedulePage = () => {
           {!loading && !error && (
             filtered.length > 0 ? (
               filtered.map((event, i) => (
-                <motion.div 
-                  key={event.id} 
-                  initial={{ opacity: 0, y: 12 }} 
-                  animate={{ opacity: 1, y: 0 }} 
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  onClick={() => setSelectedEvent(event)} // クリックでモーダルを開く
+                  onClick={() => setSelectedEvent(event)}
                   className="cursor-pointer"
                 >
-                  {/* カードにホバーエフェクトをつけるため div でラップしています */}
                   <div className="transition-transform duration-200 hover:-translate-y-1">
                     <ScheduleCard event={event} />
                   </div>
@@ -193,27 +198,24 @@ const SchedulePage = () => {
         </div>
       </div>
 
-      {/* 詳細を表示するモーダル（ポップアップ） */}
+      {/* 詳細モーダル */}
       <AnimatePresence>
         {selectedEvent && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-            {/* 背景の黒いオーバーレイ */}
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedEvent(null)}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
-            
-            {/* モーダル本体 */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl overflow-hidden border border-border"
             >
-              <button 
+              <button
                 onClick={() => setSelectedEvent(null)}
                 className="absolute top-4 right-4 p-2 bg-muted/50 hover:bg-muted text-muted-foreground rounded-full transition-colors z-10"
               >
@@ -224,10 +226,7 @@ const SchedulePage = () => {
                 <div className="mb-4 inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
                   {selectedEvent.type === "match" ? "試合" : selectedEvent.type === "practice" ? "練習" : "イベント"}
                 </div>
-                
-                <h2 className="text-2xl font-bold text-foreground mb-4">
-                  {selectedEvent.title}
-                </h2>
+                <h2 className="text-2xl font-bold text-foreground mb-4">{selectedEvent.title}</h2>
 
                 <div className="space-y-3 pb-6 border-b border-border">
                   <div className="flex items-center gap-3 text-muted-foreground text-sm">
@@ -243,7 +242,6 @@ const SchedulePage = () => {
                 </div>
 
                 <div className="pt-6 space-y-6">
-                  {/* 詳細セクション */}
                   {selectedEvent.detail && (
                     <div>
                       <h3 className="flex items-center gap-2 font-bold text-foreground mb-2 text-sm">
@@ -254,8 +252,6 @@ const SchedulePage = () => {
                       </p>
                     </div>
                   )}
-
-                  {/* 持ち物セクション */}
                   {selectedEvent.belongings && (
                     <div>
                       <h3 className="flex items-center gap-2 font-bold text-foreground mb-2 text-sm">
@@ -266,8 +262,6 @@ const SchedulePage = () => {
                       </p>
                     </div>
                   )}
-
-                  {/* どちらもない場合 */}
                   {!selectedEvent.detail && !selectedEvent.belongings && (
                     <p className="text-sm text-muted-foreground italic text-center py-4">
                       詳細情報は登録されていません。
@@ -277,6 +271,19 @@ const SchedulePage = () => {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* イベント追加フォーム（スタッフのみ） */}
+      <AnimatePresence>
+        {showForm && (
+          <EventForm
+            onClose={() => setShowForm(false)}
+            onSaved={() => {
+              setShowForm(false);
+              fetchSchedules();
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
