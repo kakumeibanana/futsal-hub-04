@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Lock, User, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 
 const LoginPage = () => {
   const [name, setName] = useState("");
@@ -13,20 +12,8 @@ const LoginPage = () => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [memberNames, setMemberNames] = useState<string[]>([]);
-
   const { login, isLoggedIn } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    supabase
-      .from("members")
-      .select("name")
-      .order("name", { ascending: true })
-      .then(({ data }) => {
-        if (data) setMemberNames(data.map((m) => m.name));
-      });
-  }, []);
 
   if (isLoggedIn) {
     navigate("/schedule", { replace: true });
@@ -41,8 +28,8 @@ const LoginPage = () => {
     e.preventDefault();
     setError("");
 
-    if (!name) {
-      setError("名前を選択してください");
+    if (!name.trim()) {
+      setError("名前を入力してください");
       return;
     }
     if (!password) {
@@ -51,7 +38,7 @@ const LoginPage = () => {
     }
 
     setSubmitting(true);
-    const { error } = await login(password, name);
+    const { error } = await login(password, name.trim());
     if (error) setError(error);
     else navigate("/schedule", { replace: true });
     setSubmitting(false);
@@ -86,16 +73,13 @@ const LoginPage = () => {
               <User size={14} className="text-muted-foreground" />
               名前
             </label>
-            <select
+            <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full h-11 rounded-md border border-input bg-background px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            >
-              <option value="">名前を選択...</option>
-              {memberNames.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
+              placeholder="表示名（例：田中太郎）"
+              className="h-11"
+              autoComplete="name"
+            />
           </div>
 
           <div className="space-y-2">
