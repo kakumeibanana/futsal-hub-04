@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Video, Plus, Trash2, X, Loader2, Youtube, Upload, Play } from "lucide-react";
+import { Video, Plus, Trash2, X, Loader2, Youtube, Upload, Play, Edit2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -166,6 +166,101 @@ const AddVideoModal = ({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   );
 };
 
+const EditVideoModal = ({ video, onClose, onSaved }: { video: VideoItem; onClose: () => void; onSaved: () => void }) => {
+  const [title, setTitle] = useState(video.title);
+  const [url, setUrl] = useState(video.url);
+  const [date, setDate] = useState(video.date);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const inputClass =
+    "w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50";
+
+  const handleSave = async () => {
+    if (!title.trim()) return setError("タイトルを入力してください");
+    if (video.type === "youtube") {
+      const videoId = extractYoutubeId(url);
+      if (!videoId) return setError("正しいYouTube URLを入力してください");
+    }
+    setSaving(true);
+    await supabase.from("videos").update({ title: title.trim(), url, date }).eq("id", video.id);
+    setSaving(false);
+    onSaved();
+    onClose();
+  };
+
+  const handleReupload = async (file: File) => {
+    setError("");
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("videos").upload(path, file);
+    if (uploadError) { setError("アップロードに失敗しました"); setUploading(false); return; }
+    const { data } = supabase.storage.from("videos").getPublicUrl(path);
+    setUrl(data.publicUrl);
+    setUploading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-md bg-card rounded-2xl border border-border p-6 space-y-4 z-10">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display font-bold text-lg text-foreground">動画を編集</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"><X size={18} /></button>
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-foreground mb-1 block">タイトル *</label>
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-foreground mb-1 block">日付</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+        </div>
+
+        {video.type === "youtube" ? (
+          <div>
+            <label className="text-xs font-semibold text-foreground mb-1 block">YouTube URL</label>
+            <input type="text" value={url} onChange={(e) => { setUrl(e.target.value); setError(""); }} className={inputClass} />
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs font-semibold text-foreground mb-1 block">動画ファイル</label>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-full py-6 rounded-xl border-2 border-dashed border-border text-muted-foreground text-sm hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50 flex flex-col items-center gap-2"
+            >
+              {uploading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+              {uploading ? "アップロード中..." : "ファイルを差し替える"}
+            </button>
+            {url !== video.url && <p className="text-xs text-green-600 mt-1">新しいファイルが選択されました</p>}
+            <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReupload(f); e.target.value = ""; }}
+            />
+          </div>
+        )}
+
+        {error && <p className="text-xs text-destructive">{error}</p>}
+
+        <button
+          onClick={handleSave}
+          disabled={saving || uploading}
+          className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {saving ? <Loader2 size={15} className="animate-spin" /> : null}
+          {saving ? "保存中..." : "保存する"}
+        </button>
+      </motion.div>
+    </div>
+  );
+};
+
 const VideoPlayer = ({ video, onClose }: { video: VideoItem; onClose: () => void }) => {
   const youtubeId = video.type === "youtube" ? extractYoutubeId(video.url) : null;
 
@@ -213,6 +308,7 @@ const VideosPage = () => {
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState<VideoItem | null>(null);
   const [playing, setPlaying] = useState<VideoItem | null>(null);
 
   const fetchVideos = async () => {
@@ -297,12 +393,20 @@ const VideosPage = () => {
                     <p className="text-xs text-muted-foreground mt-1">{v.date.replace(/^2026-/, "").replace("-", "/")}</p>
                   </div>
                   {isStaff && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(v); }}
-                      className="flex-shrink-0 p-1.5 rounded-lg bg-muted hover:bg-red-100 text-muted-foreground hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditing(v); }}
+                        className="p-1.5 rounded-lg bg-muted hover:bg-secondary text-muted-foreground transition-colors"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(v); }}
+                        className="p-1.5 rounded-lg bg-muted hover:bg-red-100 text-muted-foreground hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   )}
                 </div>
               </motion.div>
@@ -314,6 +418,9 @@ const VideosPage = () => {
       <AnimatePresence>
         {showAdd && (
           <AddVideoModal onClose={() => setShowAdd(false)} onSaved={fetchVideos} />
+        )}
+        {editing && (
+          <EditVideoModal video={editing} onClose={() => setEditing(null)} onSaved={fetchVideos} />
         )}
         {playing && (
           <VideoPlayer video={playing} onClose={() => setPlaying(null)} />
