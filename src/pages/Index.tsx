@@ -162,7 +162,7 @@ const Index = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">{item.title}</p>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1 hidden sm:block">{item.content}</p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1 hidden sm:block">{item.content.replace(/<[^>]*>/g, "")}</p>
                 </div>
                 <span className="text-xs text-muted-foreground flex-shrink-0">{item.date.replace("2026-", "").replace("-", "/")}</span>
               </Link>
