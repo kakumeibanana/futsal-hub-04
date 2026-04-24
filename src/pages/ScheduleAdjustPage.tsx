@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { CalendarCheck, Plus, X, Minus, Send, RotateCcw, ChevronLeft, Trash2, MessageCircle, Clock } from "lucide-react";
+import { CalendarCheck, Plus, X, Minus, Send, RotateCcw, ChevronLeft, Trash2, MessageCircle, Clock, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -298,6 +298,205 @@ const CreateEvent = ({
   );
 };
 
+// ── イベント編集 ──────────────────────────────────────────
+const EditEvent = ({
+  event, dates, onUpdated, onCancel,
+}: {
+  event: Event;
+  dates: EventDate[];
+  onUpdated: (updatedEvent: Event, updatedDates: EventDate[]) => void;
+  onCancel: () => void;
+}) => {
+  const { toast } = useToast();
+  const [title, setTitle] = useState(event.title);
+  const [description, setDescription] = useState(event.description ?? "");
+  const [decideCount, setDecideCount] = useState(event.decide_count);
+  const [selectedSlots, setSelectedSlots] = useState<{ date: string; timeSlot: string | null }[]>(
+    dates.map((d) => ({ date: d.date, timeSlot: d.time_slot }))
+  );
+  const [customSlot, setCustomSlot] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const futureOptions: string[] = [];
+  for (let i = 0; i < 90; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    futureOptions.push(d.toISOString().split("T")[0]);
+  }
+  const pastSelected = dates.map((d) => d.date).filter((d) => !futureOptions.includes(d));
+  const allDates = [...new Set([...pastSelected, ...futureOptions])].sort();
+
+  const toggleSlot = (date: string, timeSlot: string | null) => {
+    const key = `${date}_${timeSlot ?? ""}`;
+    setSelectedSlots((prev) => {
+      const exists = prev.some((s) => `${s.date}_${s.timeSlot ?? ""}` === key);
+      if (exists) return prev.filter((s) => `${s.date}_${s.timeSlot ?? ""}` !== key);
+      return [...prev, { date, timeSlot }];
+    });
+  };
+
+  const isSelected = (date: string, timeSlot: string | null) =>
+    selectedSlots.some((s) => s.date === date && s.timeSlot === timeSlot);
+
+  const handleSubmit = async () => {
+    if (!title.trim()) {
+      toast({ title: "タイトルを入力してください", variant: "destructive" });
+      return;
+    }
+    if (selectedSlots.length === 0) {
+      toast({ title: "候補日を1つ以上選択してください", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+
+    const { data: updatedEvent, error: updateError } = await supabase
+      .from("events")
+      .update({ title: title.trim(), description: description.trim() || null, decide_count: decideCount })
+      .eq("id", event.id)
+      .select()
+      .single();
+
+    if (updateError || !updatedEvent) {
+      toast({ title: "更新に失敗しました", variant: "destructive" });
+      setSubmitting(false);
+      return;
+    }
+
+    const existingKeys = new Set(dates.map((d) => `${d.date}_${d.time_slot ?? ""}`));
+    const newKeys = new Set(selectedSlots.map((s) => `${s.date}_${s.timeSlot ?? ""}`));
+    const addedSlots = selectedSlots.filter((s) => !existingKeys.has(`${s.date}_${s.timeSlot ?? ""}`));
+    const removedDates = dates.filter((d) => !newKeys.has(`${d.date}_${d.time_slot ?? ""}`));
+
+    for (const d of removedDates) {
+      if (d.time_slot === null) {
+        await supabase.from("responses").delete().eq("event_id", event.id).eq("date", d.date).is("time_slot", null);
+      } else {
+        await supabase.from("responses").delete().eq("event_id", event.id).eq("date", d.date).eq("time_slot", d.time_slot);
+      }
+    }
+    if (removedDates.length > 0) {
+      await supabase.from("event_dates").delete().in("id", removedDates.map((d) => d.id));
+    }
+    if (addedSlots.length > 0) {
+      await supabase.from("event_dates").insert(
+        addedSlots.map((s) => ({ event_id: event.id, date: s.date, time_slot: s.timeSlot }))
+      );
+    }
+
+    const { data: refreshedDates } = await supabase
+      .from("event_dates").select("*").eq("event_id", event.id).order("date");
+
+    toast({ title: "イベントを更新しました！" });
+    setSubmitting(false);
+    onUpdated(updatedEvent as Event, (refreshedDates ?? []) as EventDate[]);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="ghost" size="icon" onClick={onCancel}><ChevronLeft size={20} /></Button>
+        <h1 className="font-display font-bold text-2xl text-foreground">イベント編集</h1>
+      </div>
+
+      <div className="space-y-4 mb-6">
+        <div>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">タイトル</label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例: 4月練習日程" className="h-11" />
+        </div>
+        <div>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">メモ（任意）</label>
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="例: 場所は第一体育館" className="h-11" />
+        </div>
+        <div>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">決定候補数（上位N日を色付け）</label>
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="outline" size="icon" className="h-10 w-10" onClick={() => setDecideCount((c) => Math.max(1, c - 1))} disabled={decideCount <= 1}>
+              <Minus size={16} />
+            </Button>
+            <span className="text-lg font-bold text-foreground w-8 text-center">{decideCount}</span>
+            <Button type="button" variant="outline" size="icon" className="h-10 w-10" onClick={() => setDecideCount((c) => c + 1)}>
+              <Plus size={16} />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">スコア上位{decideCount}位の日程列がハイライトされます</p>
+        </div>
+      </div>
+
+      <div className="mb-2 text-sm font-medium text-foreground">候補日・時間帯を選択</div>
+      <p className="text-xs text-muted-foreground mb-3">追加・削除が可能です。削除した候補日の回答も同時に削除されます。</p>
+
+      <div className="space-y-2 mb-4 max-h-80 overflow-y-auto pr-1">
+        {allDates.map((date) => {
+          const hasAny = selectedSlots.some((s) => s.date === date);
+          return (
+            <div key={date} className={`rounded-xl border p-3 transition-all ${hasAny ? "border-primary/50 bg-primary/5" : "border-border bg-card"}`}>
+              <div className="text-sm font-medium text-foreground mb-2">{formatDate(date)}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {TIME_SLOTS.map((slot) => (
+                  <button
+                    key={slot}
+                    onClick={() => toggleSlot(date, slot)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                      isSelected(date, slot) ? "bg-primary text-primary-foreground border-primary" : "border-border bg-muted/50 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {slot}
+                  </button>
+                ))}
+                <div className="flex items-center gap-1">
+                  <input
+                    className="w-16 px-2 py-1 rounded-lg text-xs border border-border bg-muted/50 text-foreground"
+                    placeholder="カスタム"
+                    value={customSlot}
+                    onChange={(e) => setCustomSlot(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && customSlot.trim()) {
+                        toggleSlot(date, customSlot.trim());
+                        setCustomSlot("");
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => { if (customSlot.trim()) { toggleSlot(date, customSlot.trim()); setCustomSlot(""); } }}
+                    className="px-2 py-1 rounded-lg text-xs border border-border bg-muted/50 hover:bg-muted"
+                  >
+                    追加
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {selectedSlots.length > 0 && (
+        <div className="mb-6 p-3 rounded-xl bg-primary/5 border border-primary/20">
+          <div className="text-xs font-semibold text-primary mb-2">選択済み ({selectedSlots.length}件)</div>
+          <div className="flex flex-wrap gap-1.5">
+            {selectedSlots.sort((a, b) => a.date.localeCompare(b.date)).map((s) => (
+              <span
+                key={`${s.date}_${s.timeSlot}`}
+                onClick={() => toggleSlot(s.date, s.timeSlot)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary border border-primary/20 cursor-pointer hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20"
+              >
+                {formatSlotLabel(s.date, s.timeSlot)}
+                <X size={10} />
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <Button onClick={handleSubmit} disabled={submitting} className="flex-1 h-11 font-semibold">
+          {submitting ? "更新中..." : "更新する"}
+        </Button>
+        <Button variant="outline" onClick={onCancel} className="h-11">キャンセル</Button>
+      </div>
+    </div>
+  );
+};
+
 // ── 集計テーブル ──────────────────────────────────────────
 const SummaryTable = ({
   dates, responses, dateScores, topDateKeys, memberNames,
@@ -374,15 +573,18 @@ const SummaryTable = ({
 
 // ── 回答・集計・コメント ──────────────────────────────────────────
 const EventDetail = ({
-  event, memberName, isStaff, onBack, onDeleted,
+  event, memberName, isStaff, onBack, onDeleted, onUpdated,
 }: {
   event: Event;
   memberName: string;
   isStaff: boolean;
   onBack: () => void;
   onDeleted: () => void;
+  onUpdated: (updatedEvent: Event) => void;
 }) => {
   const { toast } = useToast();
+  const [currentEvent, setCurrentEvent] = useState<Event>(event);
+  const [isEditing, setIsEditing] = useState(false);
   const [dates, setDates] = useState<EventDate[]>([]);
   const [responses, setResponses] = useState<Response[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -396,11 +598,11 @@ const EventDetail = ({
   useEffect(() => {
     const load = async () => {
       const { data: datesData } = await supabase
-        .from("event_dates").select("*").eq("event_id", event.id).order("date");
+        .from("event_dates").select("*").eq("event_id", currentEvent.id).order("date");
       const { data: responsesData } = await supabase
-        .from("responses").select("*").eq("event_id", event.id);
+        .from("responses").select("*").eq("event_id", currentEvent.id);
       const { data: commentsData } = await supabase
-        .from("comments").select("*").eq("event_id", event.id).order("created_at");
+        .from("comments").select("*").eq("event_id", currentEvent.id).order("created_at");
 
       setDates((datesData ?? []) as EventDate[]);
       setResponses((responsesData ?? []) as Response[]);
@@ -424,7 +626,7 @@ const EventDetail = ({
       setLoading(false);
     };
     load();
-  }, [event.id, memberName]);
+  }, [currentEvent.id, memberName]);
 
   const cycleStatus = (eventDateId: string) => {
     const order: (Availability | null)[] = [null, "available", "maybe", "unavailable"];
@@ -496,8 +698,8 @@ const EventDetail = ({
   };
 
   const handleDelete = async () => {
-    if (!confirm(`「${event.title}」を削除しますか？`)) return;
-    await supabase.from("events").delete().eq("id", event.id);
+    if (!confirm(`「${currentEvent.title}」を削除しますか？`)) return;
+    await supabase.from("events").delete().eq("id", currentEvent.id);
     toast({ title: "イベントを削除しました" });
     onDeleted();
   };
@@ -512,7 +714,7 @@ const EventDetail = ({
   });
 
   // 上位N位の日程を算出（同点は全て含む）
-  const decideCount = event.decide_count ?? 1;
+  const decideCount = currentEvent.decide_count ?? 1;
   const uniqueScores = [...new Set(dateScores.map((d) => d.score))].filter((s) => s > 0).sort((a, b) => b - a);
   const topNThreshold = uniqueScores.length >= decideCount ? uniqueScores[decideCount - 1] : 0;
   const topDateKeys = new Set(
@@ -521,20 +723,42 @@ const EventDetail = ({
 
   if (loading) return <div className="text-center py-16 text-muted-foreground">読み込み中...</div>;
 
+  if (isEditing) return (
+    <EditEvent
+      event={currentEvent}
+      dates={dates}
+      onUpdated={(updatedEvent, updatedDates) => {
+        setCurrentEvent(updatedEvent);
+        setDates(updatedDates);
+        supabase.from("responses").select("*").eq("event_id", updatedEvent.id).then(({ data }) => {
+          setResponses((data ?? []) as Response[]);
+        });
+        onUpdated(updatedEvent);
+        setIsEditing(false);
+      }}
+      onCancel={() => setIsEditing(false)}
+    />
+  );
+
   return (
     <div>
       <div className="flex items-center justify-between mb-2 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <Button variant="ghost" size="icon" onClick={onBack} className="flex-shrink-0"><ChevronLeft size={20} /></Button>
-          <h1 className="font-display font-bold text-xl sm:text-2xl text-foreground truncate">{event.title}</h1>
+          <h1 className="font-display font-bold text-xl sm:text-2xl text-foreground truncate">{currentEvent.title}</h1>
         </div>
         {isStaff && (
-          <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive flex-shrink-0">
-            <Trash2 size={18} />
-          </Button>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} className="text-muted-foreground hover:text-foreground">
+              <Edit2 size={18} />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive">
+              <Trash2 size={18} />
+            </Button>
+          </div>
         )}
       </div>
-      {event.description && <p className="text-sm text-muted-foreground mb-6 ml-12">{event.description}</p>}
+      {currentEvent.description && <p className="text-sm text-muted-foreground mb-6 ml-12">{currentEvent.description}</p>}
 
       {/* 回答エリア */}
       <div className={`mb-8 ${submitted ? "p-4 rounded-xl border border-border bg-muted/20" : ""}`}>
@@ -676,6 +900,7 @@ const ScheduleAdjustPage = () => {
           isStaff={isStaff}
           onBack={() => setView("list")}
           onDeleted={() => { loadEvents(); setView("list"); }}
+          onUpdated={(updatedEvent) => { setSelectedEvent(updatedEvent); loadEvents(); }}
         />
       )}
     </div>
