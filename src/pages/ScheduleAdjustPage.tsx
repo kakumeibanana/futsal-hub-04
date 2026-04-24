@@ -441,21 +441,33 @@ const EventDetail = ({
     }
     setUpdatingResponse(true);
 
-    await supabase.from("responses").delete()
-      .eq("event_id", event.id).eq("member_name", memberName);
+    const insertRows = entries.map(([eventDateId, availability]) => {
+      const dateSlot = dates.find((d) => d.id === eventDateId)!;
+      return {
+        event_id: event.id,
+        member_name: memberName,
+        date: dateSlot.date,
+        time_slot: dateSlot.time_slot,
+        availability: availability as Availability,
+      };
+    });
 
-    await supabase.from("responses").insert(
-      entries.map(([eventDateId, availability]) => {
-        const dateSlot = dates.find((d) => d.id === eventDateId)!;
-        return {
-          event_id: event.id,
-          member_name: memberName,
-          date: dateSlot.date,
-          time_slot: dateSlot.time_slot,
-          availability: availability as Availability,
-        };
-      })
-    );
+    // 先に既存IDを保存 → 新規挿入 → 成功したら旧データ削除（データロスト防止）
+    const { data: existingData } = await supabase
+      .from("responses").select("id")
+      .eq("event_id", event.id).eq("member_name", memberName);
+    const existingIds = (existingData ?? []).map((r: any) => r.id);
+
+    const { error: insertError } = await supabase.from("responses").insert(insertRows);
+    if (insertError) {
+      toast({ title: "送信に失敗しました", description: insertError.message, variant: "destructive" });
+      setUpdatingResponse(false);
+      return;
+    }
+
+    if (existingIds.length > 0) {
+      await supabase.from("responses").delete().in("id", existingIds);
+    }
 
     const { data: responsesData } = await supabase
       .from("responses").select("*").eq("event_id", event.id);
@@ -570,7 +582,7 @@ const EventDetail = ({
       </div>
 
       {/* 集計テーブル */}
-      {responses.length > 0 && (
+      {dates.length > 0 && (
         <SummaryTable
           dates={dates}
           responses={responses}
