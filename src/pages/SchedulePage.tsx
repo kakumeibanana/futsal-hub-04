@@ -4,7 +4,7 @@ import ScheduleCard from "@/components/ScheduleCard";
 import EventForm from "@/components/EventForm";
 import {
   CalendarDays, Loader2, AlertCircle,
-  X, MapPin, Clock, Info, Briefcase, Plus,
+  X, MapPin, Clock, Info, Briefcase, Plus, Edit2, Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +40,7 @@ const SchedulePage = () => {
   const [selectedEvent, setSelectedEvent] = useState<MappedEvent | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [duplicateValues, setDuplicateValues] = useState<MappedEvent | null>(null);
+  const [editingEvent, setEditingEvent] = useState<MappedEvent | null>(null);
 
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
@@ -95,6 +96,13 @@ const SchedulePage = () => {
     }
     return true;
   });
+
+  const handleDeleteEvent = async (event: MappedEvent) => {
+    if (!confirm(`「${event.title}」を削除しますか？`)) return;
+    await supabase.from("schedule_events").delete().eq("id", event.id);
+    setSelectedEvent(null);
+    fetchSchedules();
+  };
 
   const eventDates = events.map((e) => new Date(e.date + "T12:00:00"));
 
@@ -218,18 +226,38 @@ const SchedulePage = () => {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl overflow-hidden border border-border"
             >
-              <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
                 {isStaff && (
-                  <button
-                    onClick={() => {
-                      setDuplicateValues(selectedEvent);
-                      setSelectedEvent(null);
-                      setShowForm(true);
-                    }}
-                    className="px-3 py-1.5 bg-muted/80 hover:bg-muted text-muted-foreground rounded-full text-xs font-semibold transition-colors"
-                  >
-                    複製
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditingEvent(selectedEvent);
+                        setSelectedEvent(null);
+                        setShowForm(true);
+                      }}
+                      className="p-2 bg-muted/80 hover:bg-muted text-muted-foreground rounded-full transition-colors"
+                      title="編集"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteEvent(selectedEvent)}
+                      className="p-2 bg-muted/80 hover:bg-red-100 text-muted-foreground hover:text-red-600 rounded-full transition-colors"
+                      title="削除"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDuplicateValues(selectedEvent);
+                        setSelectedEvent(null);
+                        setShowForm(true);
+                      }}
+                      className="px-3 py-1.5 bg-muted/80 hover:bg-muted text-muted-foreground rounded-full text-xs font-semibold transition-colors"
+                    >
+                      複製
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => setSelectedEvent(null)}
@@ -295,13 +323,25 @@ const SchedulePage = () => {
       <AnimatePresence>
         {showForm && (
           <EventForm
-            onClose={() => { setShowForm(false); setDuplicateValues(null); }}
+            onClose={() => { setShowForm(false); setDuplicateValues(null); setEditingEvent(null); }}
             onSaved={() => {
               setShowForm(false);
               setDuplicateValues(null);
+              setEditingEvent(null);
               fetchSchedules();
             }}
-            initialValues={duplicateValues ? {
+            eventId={editingEvent?.id}
+            initialValues={editingEvent ? {
+              title: editingEvent.title,
+              date: editingEvent.date,
+              isAllDay: editingEvent.time === "終日",
+              startTime: editingEvent.time !== "終日" ? editingEvent.time.split(" - ")[0] : "",
+              endTime: editingEvent.time !== "終日" ? editingEvent.time.split(" - ")[1] ?? "" : "",
+              location: editingEvent.location,
+              type: editingEvent.type,
+              detail: editingEvent.detail,
+              belongings: editingEvent.belongings,
+            } : duplicateValues ? {
               title: duplicateValues.title,
               isAllDay: duplicateValues.time === "終日",
               startTime: duplicateValues.time !== "終日" ? duplicateValues.time.split(" - ")[0] : "",

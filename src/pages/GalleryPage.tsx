@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ImageIcon, Plus, Trash2, X, Loader2 } from "lucide-react";
+import { ImageIcon, Plus, Trash2, X, Loader2, Edit2, Check, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +17,11 @@ const GalleryPage = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState<GalleryImage | null>(null);
+  const [editingCaption, setEditingCaption] = useState(false);
+  const [captionInput, setCaptionInput] = useState("");
+  const [replaceUploading, setReplaceUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
 
   const fetchImages = async () => {
     const { data } = await supabase
@@ -50,6 +54,32 @@ const GalleryPage = () => {
     await supabase.from("gallery_images").delete().eq("id", img.id);
     setImages((prev) => prev.filter((i) => i.id !== img.id));
     if (lightbox?.id === img.id) setLightbox(null);
+  };
+
+  const handleSaveCaption = async () => {
+    if (!lightbox) return;
+    await supabase.from("gallery_images").update({ caption: captionInput }).eq("id", lightbox.id);
+    const updated = { ...lightbox, caption: captionInput };
+    setImages((prev) => prev.map((i) => (i.id === lightbox.id ? updated : i)));
+    setLightbox(updated);
+    setEditingCaption(false);
+  };
+
+  const handleReplace = async (files: FileList) => {
+    if (!files[0] || !lightbox) return;
+    setReplaceUploading(true);
+    const file = files[0];
+    const ext = file.name.split(".").pop();
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage.from("news-images").upload(path, file);
+    if (!error) {
+      const { data } = supabase.storage.from("news-images").getPublicUrl(path);
+      await supabase.from("gallery_images").update({ url: data.publicUrl }).eq("id", lightbox.id);
+      const updated = { ...lightbox, url: data.publicUrl };
+      setImages((prev) => prev.map((i) => (i.id === lightbox.id ? updated : i)));
+      setLightbox(updated);
+    }
+    setReplaceUploading(false);
   };
 
   return (
@@ -100,7 +130,7 @@ const GalleryPage = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.04 }}
               className="break-inside-avoid rounded-xl overflow-hidden relative group cursor-pointer"
-              onClick={() => setLightbox(img)}
+              onClick={() => { setLightbox(img); setCaptionInput(img.caption || ""); setEditingCaption(false); }}
             >
               <img
                 src={img.url}
@@ -138,7 +168,57 @@ const GalleryPage = () => {
               exit={{ opacity: 0, scale: 0.9 }}
               className="relative max-w-3xl w-full"
             >
-              <img src={lightbox.url} alt={lightbox.caption} className="w-full rounded-2xl" />
+              <img src={lightbox.url} alt={lightbox.caption} className="w-full rounded-t-2xl" />
+
+              {/* Caption + staff controls */}
+              <div className="bg-black/70 backdrop-blur-sm rounded-b-2xl px-4 py-3">
+                {isStaff && editingCaption ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      value={captionInput}
+                      onChange={(e) => setCaptionInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleSaveCaption(); if (e.key === "Escape") setEditingCaption(false); }}
+                      placeholder="キャプションを入力..."
+                      className="flex-1 bg-white/10 text-white placeholder-white/40 text-sm px-3 py-1.5 rounded-lg border border-white/20 focus:outline-none focus:border-white/50"
+                    />
+                    <button onClick={handleSaveCaption} className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"><Check size={15} /></button>
+                    <button onClick={() => setEditingCaption(false)} className="p-1.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"><X size={15} /></button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 min-h-[28px]">
+                    <p className="flex-1 text-sm text-white/80">{lightbox.caption || (isStaff ? "キャプションを追加..." : "")}</p>
+                    {isStaff && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => setEditingCaption(true)}
+                          className="p-1.5 bg-white/10 hover:bg-white/20 text-white/70 hover:text-white rounded-lg transition-colors"
+                          title="キャプション編集"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => replaceInputRef.current?.click()}
+                          disabled={replaceUploading}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white/70 hover:text-white rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                          title="写真を差し替え"
+                        >
+                          {replaceUploading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                          差し替え
+                        </button>
+                        <input
+                          ref={replaceInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => { if (e.target.files?.length) handleReplace(e.target.files); e.target.value = ""; }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => setLightbox(null)}
                 className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"

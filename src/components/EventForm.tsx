@@ -20,9 +20,11 @@ interface EventFormProps {
   onClose: () => void;
   onSaved: () => void;
   initialValues?: InitialValues;
+  eventId?: string;
 }
 
-const EventForm = ({ onClose, onSaved, initialValues }: EventFormProps) => {
+const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps) => {
+  const isEditing = !!eventId;
   const { memberName } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,36 +49,48 @@ const EventForm = ({ onClose, onSaved, initialValues }: EventFormProps) => {
     setError(null);
 
     try {
-      const { data: newEvent, error: insertError } = await supabase
-        .from("schedule_events")
-        .insert({
-          title,
-          date,
-          start_time: isAllDay ? null : startTime || null,
-          end_time: isAllDay ? null : endTime || null,
-          is_all_day: isAllDay,
-          location,
-          type,
-          detail,
-          belongings,
-          line_notify_type: lineNotify,
-          line_send_at:
-            lineNotify === "scheduled" && lineSendAt
-              ? new Date(lineSendAt).toISOString()
-              : null,
-          line_sent: false,
-          created_by: memberName,
-        })
-        .select()
-        .single();
+      const fields = {
+        title,
+        date,
+        start_time: isAllDay ? null : startTime || null,
+        end_time: isAllDay ? null : endTime || null,
+        is_all_day: isAllDay,
+        location,
+        type,
+        detail,
+        belongings,
+      };
 
-      if (insertError) throw insertError;
+      if (isEditing) {
+        const { error: updateError } = await supabase
+          .from("schedule_events")
+          .update(fields)
+          .eq("id", eventId);
+        if (updateError) throw updateError;
+      } else {
+        const { data: newEvent, error: insertError } = await supabase
+          .from("schedule_events")
+          .insert({
+            ...fields,
+            line_notify_type: lineNotify,
+            line_send_at:
+              lineNotify === "scheduled" && lineSendAt
+                ? new Date(lineSendAt).toISOString()
+                : null,
+            line_sent: false,
+            created_by: memberName,
+          })
+          .select()
+          .single();
 
-      if (lineNotify === "immediate" && newEvent) {
-        const { error: fnError } = await supabase.functions.invoke("line-notify", {
-          body: { event_id: newEvent.id },
-        });
-        if (fnError) throw new Error("LINE送信に失敗しました: " + fnError.message);
+        if (insertError) throw insertError;
+
+        if (lineNotify === "immediate" && newEvent) {
+          const { error: fnError } = await supabase.functions.invoke("line-notify", {
+            body: { event_id: newEvent.id },
+          });
+          if (fnError) throw new Error("LINE送信に失敗しました: " + fnError.message);
+        }
       }
 
       onSaved();
@@ -113,7 +127,7 @@ const EventForm = ({ onClose, onSaved, initialValues }: EventFormProps) => {
         </button>
 
         <div className="p-6 sm:p-8">
-          <h2 className="text-xl font-bold text-foreground mb-6">イベントを追加</h2>
+          <h2 className="text-xl font-bold text-foreground mb-6">{isEditing ? "イベントを編集" : "イベントを追加"}</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -228,37 +242,39 @@ const EventForm = ({ onClose, onSaved, initialValues }: EventFormProps) => {
               />
             </div>
 
-            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
-              <p className="text-sm font-semibold text-foreground">LINE通知</p>
-              <div className="flex gap-2">
-                {(["none", "immediate", "scheduled"] as const).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setLineNotify(n)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                      lineNotify === n
-                        ? "bg-green-600 text-white border-green-600"
-                        : "bg-muted text-muted-foreground border-border hover:bg-secondary"
-                    }`}
-                  >
-                    {n === "none" ? "送らない" : n === "immediate" ? "今すぐ送る" : "予約配信"}
-                  </button>
-                ))}
-              </div>
-              {lineNotify === "scheduled" && (
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-1 block">送信日時</label>
-                  <input
-                    type="datetime-local"
-                    value={lineSendAt}
-                    onChange={(e) => setLineSendAt(e.target.value)}
-                    required={lineNotify === "scheduled"}
-                    className={inputClass}
-                  />
+            {!isEditing && (
+              <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
+                <p className="text-sm font-semibold text-foreground">LINE通知</p>
+                <div className="flex gap-2">
+                  {(["none", "immediate", "scheduled"] as const).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setLineNotify(n)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                        lineNotify === n
+                          ? "bg-green-600 text-white border-green-600"
+                          : "bg-muted text-muted-foreground border-border hover:bg-secondary"
+                      }`}
+                    >
+                      {n === "none" ? "送らない" : n === "immediate" ? "今すぐ送る" : "予約配信"}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
+                {lineNotify === "scheduled" && (
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1 block">送信日時</label>
+                    <input
+                      type="datetime-local"
+                      value={lineSendAt}
+                      onChange={(e) => setLineSendAt(e.target.value)}
+                      required={lineNotify === "scheduled"}
+                      className={inputClass}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {error && (
               <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-lg">
@@ -272,7 +288,7 @@ const EventForm = ({ onClose, onSaved, initialValues }: EventFormProps) => {
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? "保存中..." : "保存する"}
+              {loading ? "保存中..." : isEditing ? "更新する" : "保存する"}
             </button>
           </form>
         </div>
