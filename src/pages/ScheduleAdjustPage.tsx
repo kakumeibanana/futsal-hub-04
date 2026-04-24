@@ -30,6 +30,7 @@ interface Response {
   event_id: string;
   member_name: string;
   date: string;
+  time_slot: string | null;
   availability: Availability;
 }
 
@@ -299,12 +300,12 @@ const CreateEvent = ({
 
 // ── 集計テーブル ──────────────────────────────────────────
 const SummaryTable = ({
-  dates, responses, dateScores, topDates, memberNames,
+  dates, responses, dateScores, topDateKeys, memberNames,
 }: {
   dates: EventDate[];
   responses: Response[];
-  dateScores: { date: string; score: number }[];
-  topDates: Set<string>;
+  dateScores: { date: string; time_slot: string | null; score: number }[];
+  topDateKeys: Set<string>;
   memberNames: string[];
 }) => (
   <div className="mb-8">
@@ -314,16 +315,19 @@ const SummaryTable = ({
         <thead>
           <tr className="border-b border-border bg-muted/50">
             <th className="text-left px-3 py-2 font-medium text-muted-foreground sticky left-0 bg-muted/50">名前</th>
-            {dates.map((d) => (
-              <th
-                key={`${d.date}_${d.time_slot}`}
-                className={`px-3 py-2 font-medium text-center whitespace-nowrap ${
-                  topDates.has(d.date) ? "bg-primary/10 text-primary" : "text-muted-foreground"
-                }`}
-              >
-                {formatSlotLabel(d.date, d.time_slot)}
-              </th>
-            ))}
+            {dates.map((d) => {
+              const key = `${d.date}_${d.time_slot ?? ""}`;
+              return (
+                <th
+                  key={key}
+                  className={`px-3 py-2 font-medium text-center whitespace-nowrap ${
+                    topDateKeys.has(key) ? "bg-primary/10 text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  {formatSlotLabel(d.date, d.time_slot)}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -331,11 +335,12 @@ const SummaryTable = ({
             <tr key={name} className="border-b border-border last:border-0">
               <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap sticky left-0 bg-background">{name}</td>
               {dates.map((d) => {
-                const res = responses.find((r) => r.member_name === name && r.date === d.date);
+                const key = `${d.date}_${d.time_slot ?? ""}`;
+                const res = responses.find((r) => r.member_name === name && r.date === d.date && r.time_slot === d.time_slot);
                 const cfg = res ? statusConfig[res.availability as Availability] : null;
-                const isTop = topDates.has(d.date);
+                const isTop = topDateKeys.has(key);
                 return (
-                  <td key={`${d.date}_${d.time_slot}`} className={`px-3 py-2 text-center ${isTop ? "bg-primary/5" : ""}`}>
+                  <td key={key} className={`px-3 py-2 text-center ${isTop ? "bg-primary/5" : ""}`}>
                     {cfg ? (
                       <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold border ${cfg.className}`}>
                         {cfg.label}
@@ -350,9 +355,10 @@ const SummaryTable = ({
           <tr className="bg-muted/30">
             <td className="px-3 py-2 font-semibold text-foreground text-sm sticky left-0 bg-muted/30">スコア</td>
             {dateScores.map((ds) => {
-              const isTop = topDates.has(ds.date);
+              const key = `${ds.date}_${ds.time_slot ?? ""}`;
+              const isTop = topDateKeys.has(key);
               return (
-                <td key={ds.date} className={`px-3 py-2 text-center font-bold ${isTop ? "text-primary bg-primary/10" : "text-muted-foreground"}`}>
+                <td key={key} className={`px-3 py-2 text-center font-bold ${isTop ? "text-primary bg-primary/10" : "text-muted-foreground"}`}>
                   {ds.score}
                   {isTop && <span className="ml-0.5">★</span>}
                 </td>
@@ -400,10 +406,16 @@ const EventDetail = ({
       setResponses((responsesData ?? []) as Response[]);
       setComments(commentsData as Comment[] ?? []);
 
+      // mySelections は EventDate の id をキーとして管理する
       const mine: Record<string, Availability | null> = {};
       (responsesData ?? [])
         .filter((r) => r.member_name === memberName)
-        .forEach((r) => { mine[r.date] = r.availability as Availability; });
+        .forEach((r) => {
+          const dateSlot = (datesData ?? []).find(
+            (d) => d.date === r.date && d.time_slot === r.time_slot
+          );
+          if (dateSlot) mine[dateSlot.id] = r.availability as Availability;
+        });
 
       if (Object.keys(mine).length > 0) {
         setMySelections(mine);
@@ -414,11 +426,11 @@ const EventDetail = ({
     load();
   }, [event.id, memberName]);
 
-  const cycleStatus = (date: string) => {
+  const cycleStatus = (eventDateId: string) => {
     const order: (Availability | null)[] = [null, "available", "maybe", "unavailable"];
-    const current = mySelections[date] ?? null;
+    const current = mySelections[eventDateId] ?? null;
     const idx = order.indexOf(current);
-    setMySelections((prev) => ({ ...prev, [date]: order[(idx + 1) % order.length] }));
+    setMySelections((prev) => ({ ...prev, [eventDateId]: order[(idx + 1) % order.length] }));
   };
 
   const handleSubmit = async () => {
@@ -433,10 +445,16 @@ const EventDetail = ({
       .eq("event_id", event.id).eq("member_name", memberName);
 
     await supabase.from("responses").insert(
-      entries.map(([date, availability]) => ({
-        event_id: event.id, member_name: memberName,
-        date, availability: availability as Availability,
-      }))
+      entries.map(([eventDateId, availability]) => {
+        const dateSlot = dates.find((d) => d.id === eventDateId)!;
+        return {
+          event_id: event.id,
+          member_name: memberName,
+          date: dateSlot.date,
+          time_slot: dateSlot.time_slot,
+          availability: availability as Availability,
+        };
+      })
     );
 
     const { data: responsesData } = await supabase
@@ -476,28 +494,30 @@ const EventDetail = ({
   const memberNames = [...new Set(responses.map((r) => r.member_name))];
   const dateScores = dates.map((d) => {
     const score = responses
-      .filter((r) => r.date === d.date)
+      .filter((r) => r.date === d.date && r.time_slot === d.time_slot)
       .reduce((sum, r) => sum + (statusConfig[r.availability as Availability]?.score ?? 0), 0);
-    return { date: d.date, score };
+    return { date: d.date, time_slot: d.time_slot, score };
   });
 
   // 上位N位の日程を算出（同点は全て含む）
   const decideCount = event.decide_count ?? 1;
   const uniqueScores = [...new Set(dateScores.map((d) => d.score))].filter((s) => s > 0).sort((a, b) => b - a);
   const topNThreshold = uniqueScores.length >= decideCount ? uniqueScores[decideCount - 1] : 0;
-  const topDates = new Set(dateScores.filter((d) => d.score > 0 && d.score >= topNThreshold).map((d) => d.date));
+  const topDateKeys = new Set(
+    dateScores.filter((d) => d.score > 0 && d.score >= topNThreshold).map((d) => `${d.date}_${d.time_slot ?? ""}`)
+  );
 
   if (loading) return <div className="text-center py-16 text-muted-foreground">読み込み中...</div>;
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}><ChevronLeft size={20} /></Button>
-          <h1 className="font-display font-bold text-xl sm:text-2xl text-foreground">{event.title}</h1>
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Button variant="ghost" size="icon" onClick={onBack} className="flex-shrink-0"><ChevronLeft size={20} /></Button>
+          <h1 className="font-display font-bold text-xl sm:text-2xl text-foreground truncate">{event.title}</h1>
         </div>
         {isStaff && (
-          <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive">
+          <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive flex-shrink-0">
             <Trash2 size={18} />
           </Button>
         )}
@@ -520,12 +540,12 @@ const EventDetail = ({
         )}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
           {dates.map((slot) => {
-            const status = mySelections[slot.date] ?? null;
+            const status = mySelections[slot.id] ?? null;
             const cfg = status ? statusConfig[status] : null;
             return (
               <button
-                key={`${slot.date}_${slot.time_slot}`}
-                onClick={() => cycleStatus(slot.date)}
+                key={slot.id}
+                onClick={() => cycleStatus(slot.id)}
                 className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                   cfg ? cfg.className : "border-border bg-card hover:bg-muted/50 text-foreground"
                 }`}
@@ -555,7 +575,7 @@ const EventDetail = ({
           dates={dates}
           responses={responses}
           dateScores={dateScores}
-          topDates={topDates}
+          topDateKeys={topDateKeys}
           memberNames={memberNames}
         />
       )}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Plus, Edit2, Trash2, X, Check, Loader2 } from "lucide-react";
+import { Bell, Plus, Edit2, Trash2, X, Check, Loader2, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNewsList, type NewsItem } from "@/hooks/useNews";
@@ -138,6 +138,10 @@ const NewsPage = () => {
 
   return (
     <div className="container py-10">
+      <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6 -ml-1 px-2 py-1 rounded-lg hover:bg-muted">
+        <ArrowLeft size={15} />
+        ホームへ戻る
+      </Link>
       <div className="flex items-center justify-between mb-8">
         <h1 className="font-display font-bold text-3xl text-foreground flex items-center gap-2">
           <Bell size={28} className="text-primary" />

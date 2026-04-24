@@ -134,7 +134,7 @@ const MemberCard = ({
       {/* 背番号（右側・背番号フォントで巨大配置） */}
       {member.number != null && (
         <div className="flex-shrink-0 pl-1">
-          <span className="text-[3.5rem] leading-none font-black text-purple-950 tracking-tighter drop-shadow-sm font-sans">
+          <span className="text-[2.5rem] sm:text-[3.5rem] leading-none font-black text-purple-950 tracking-tighter drop-shadow-sm font-sans">
             {member.number}
           </span>
         </div>
@@ -335,15 +335,16 @@ const MembersPage = () => {
   return (
     <div className="container py-8 sm:py-12 max-w-5xl">
       <div className="flex items-center justify-between mb-8 pb-3 border-b-2 border-purple-100">
-        <h1 className="font-display font-black text-3xl sm:text-4xl text-purple-950 flex items-center gap-3.5 tracking-tight drop-shadow-sm">
-          <Users size={34} className="text-purple-600" />
+        <h1 className="font-display font-black text-2xl sm:text-4xl text-purple-950 flex items-center gap-2 sm:gap-3.5 tracking-tight drop-shadow-sm min-w-0">
+          <Users size={26} className="text-purple-600 flex-shrink-0 sm:hidden" />
+          <Users size={34} className="text-purple-600 flex-shrink-0 hidden sm:block" />
           MEMBER
-          <span className="text-lg font-bold text-purple-400 ml-1.5 bg-purple-50 px-3 py-0.5 rounded-full border border-purple-100">
+          <span className="text-base sm:text-lg font-bold text-purple-400 ml-1 sm:ml-1.5 bg-purple-50 px-2 sm:px-3 py-0.5 rounded-full border border-purple-100 flex-shrink-0">
             {members.length}
           </span>
         </h1>
         {isStaff && !showForm && !editingMember && (
-          <Button onClick={() => setShowForm(true)} className="gap-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm rounded-lg px-5">
+          <Button onClick={() => setShowForm(true)} className="hidden sm:flex gap-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm rounded-lg px-5">
             <Plus size={18} />メンバー追加
           </Button>
         )}
@@ -353,6 +354,16 @@ const MembersPage = () => {
         <div className="mb-6 max-w-2xl mx-auto">
           <MemberForm onSave={handleAdd} onCancel={() => setShowForm(false)} />
         </div>
+      )}
+
+      {/* モバイル用FAB */}
+      {isStaff && !showForm && !editingMember && (
+        <button
+          onClick={() => setShowForm(true)}
+          className="fixed bottom-6 right-6 z-40 sm:hidden w-14 h-14 rounded-full bg-purple-600 shadow-lg shadow-purple-200 flex items-center justify-center text-white active:scale-95 transition-transform"
+        >
+          <Plus size={24} />
+        </button>
       )}
 
       {/* 2列レイアウトに変更 */}

@@ -39,12 +39,9 @@ const SiteHeader = () => {
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="container flex items-center justify-between h-14 sm:h-16">
-        <Link to="/" className="flex items-center gap-2 font-display font-bold text-lg sm:text-xl tracking-tight">
-          {/* ✋ 元の「F」のspanタグだけを削除して、imgタグに置き換えます */}
-          <img src={futsalLogo} alt="Futsal Club Logo" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover" />
-          
-          {/* ✅ 隣のテキストはそのまま残します */}
-          <span className="text-foreground">Tsukuba <span className="text-gradient-primary">Futsal Club</span></span>
+        <Link to="/" className="flex items-center gap-2 font-display font-bold text-lg sm:text-xl tracking-tight flex-shrink-0 min-w-0">
+          <img src={futsalLogo} alt="Futsal Club Logo" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover flex-shrink-0" />
+          <span className="whitespace-nowrap text-foreground">Tsukuba <span className="text-gradient-primary">Futsal Club</span></span>
         </Link>
 
         {/* Desktop nav */}

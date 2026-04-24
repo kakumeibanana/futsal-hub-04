@@ -6,6 +6,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNewsDetail } from "@/hooks/useNews";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const categoryColor: Record<string, string> = {
+  重要: "bg-red-100 text-red-700",
+  試合結果: "bg-blue-100 text-blue-700",
+  連絡: "bg-yellow-100 text-yellow-700",
+  その他: "bg-secondary text-secondary-foreground",
+};
+
 const NewsDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -56,7 +63,7 @@ const NewsDetailPage = () => {
         transition={{ duration: 0.4 }}
       >
         <div className="flex items-center gap-3 mb-4">
-          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
+          <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${categoryColor[item.category] ?? categoryColor["その他"]}`}>
             {item.category}
           </span>
           {item.visibility === "member" && (

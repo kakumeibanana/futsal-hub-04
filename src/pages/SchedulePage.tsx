@@ -100,18 +100,20 @@ const SchedulePage = () => {
 
   return (
     <div className="container py-10 relative">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="font-display font-bold text-3xl text-foreground flex items-center gap-2">
-          <CalendarDays size={28} className="text-primary" />
+      <div className="flex items-center justify-between mb-8 gap-3">
+        <h1 className="font-display font-bold text-2xl sm:text-3xl text-foreground flex items-center gap-2 flex-shrink-0">
+          <CalendarDays size={24} className="text-primary sm:hidden" />
+          <CalendarDays size={28} className="text-primary hidden sm:block" />
           日程
         </h1>
         {isStaff && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors flex-shrink-0"
           >
-            <Plus size={16} />
-            イベントを追加
+            <Plus size={14} />
+            <span className="hidden sm:inline">イベントを追加</span>
+            <span className="sm:hidden">追加</span>
           </button>
         )}
       </div>
@@ -119,14 +121,14 @@ const SchedulePage = () => {
       <div className="grid md:grid-cols-[300px_1fr] gap-8">
         {/* Sidebar */}
         <div className="space-y-6">
-          <div className="rounded-xl border border-border bg-card p-4">
+          <div className="rounded-xl border border-border bg-card p-4 overflow-hidden">
             <Calendar
               mode="single"
               selected={selectedDate}
               onSelect={setSelectedDate}
               modifiers={{ hasEvent: eventDates }}
               modifiersStyles={{ hasEvent: { fontWeight: 700, color: "hsl(270 60% 52%)" } }}
-              className="pointer-events-auto"
+              className="pointer-events-auto w-full"
             />
             {selectedDate && (
               <button

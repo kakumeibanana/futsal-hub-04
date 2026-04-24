@@ -1,19 +1,34 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CalendarDays, ArrowRight, Bell, Users, Trophy, Target, Heart } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import ScheduleCard from "@/components/ScheduleCard";
-import { scheduleEvents } from "@/data/sampleData";
 import { useNewsList } from "@/hooks/useNews";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-futsal.jpg";
 import gasshukuImg from "@/assets/フットサル部合宿.jpeg";
 
+const categoryColor: Record<string, string> = {
+  重要: "bg-red-100 text-red-700",
+  試合結果: "bg-blue-100 text-blue-700",
+  連絡: "bg-yellow-100 text-yellow-700",
+  その他: "bg-secondary text-secondary-foreground",
+};
+
+type EventType = "match" | "practice" | "event";
+interface HomeEvent {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  type: EventType;
+}
+
 const d = new Date();
 const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const publicSchedule = scheduleEvents.filter((e) => e.type !== "practice");
-const todayEvents = scheduleEvents.filter((e) => e.date === today);
-const upcomingEvents = publicSchedule.filter((e) => e.date >= today);
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -45,6 +60,34 @@ const Index = () => {
   const { data: allNews = [], isLoading: newsLoading } = useNewsList();
   const publicNews = allNews.filter((n) => n.visibility === "public");
 
+  const [homeEvents, setHomeEvents] = useState<HomeEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetch = async () => {
+      const { data } = await supabase
+        .from("schedule_events")
+        .select("id, title, date, start_time, end_time, is_all_day, location, type")
+        .gte("date", today)
+        .order("date", { ascending: true });
+      const mapped: HomeEvent[] = (data ?? []).map((row) => {
+        let time = "終日";
+        if (!row.is_all_day && row.start_time) {
+          const start = (row.start_time as string).slice(0, 5);
+          const end = row.end_time ? (row.end_time as string).slice(0, 5) : "";
+          time = end ? `${start} - ${end}` : `${start}~`;
+        }
+        return { id: row.id, title: row.title, date: row.date, time, location: row.location, type: row.type as EventType };
+      });
+      setHomeEvents(mapped);
+      setEventsLoading(false);
+    };
+    fetch();
+  }, []);
+
+  const todayEvents = homeEvents.filter((e) => e.date === today);
+  const upcomingEvents = homeEvents.filter((e) => e.type !== "practice" && e.date >= today);
+
   return (
   <div>
     {/* Hero */}
@@ -60,7 +103,7 @@ const Index = () => {
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="max-w-2xl"
         >
-          <h1 className="font-display font-black text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-primary-foreground leading-[0.95] tracking-tight">
+          <h1 className="font-display font-black text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-primary-foreground leading-[0.95] tracking-tight">
             TSUKUBA FUTSAL CLUB
             <br />
             <span className="text-gradient-hero-accent">136 - 137</span>
@@ -103,7 +146,9 @@ const Index = () => {
             {new Date(today).toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" })}
           </span>
         </div>
-        {todayEvents.length > 0 ? (
+        {eventsLoading ? (
+          <Skeleton className="h-14 rounded-xl" />
+        ) : todayEvents.length > 0 ? (
           <div className="space-y-3">
             {todayEvents.map((event, i) => (
               <motion.div key={event.id} custom={i} variants={fadeUp}>
@@ -121,11 +166,17 @@ const Index = () => {
     <section className="container mt-12 sm:mt-16">
       <SectionHeader icon={CalendarDays} title="直近の予定" />
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
-        {upcomingEvents.map((event, i) => (
-          <motion.div key={event.id} custom={i} variants={fadeUp}>
-            <ScheduleCard event={event} />
-          </motion.div>
-        ))}
+        {eventsLoading ? (
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)
+        ) : upcomingEvents.length > 0 ? (
+          upcomingEvents.map((event, i) => (
+            <motion.div key={event.id} custom={i} variants={fadeUp}>
+              <ScheduleCard event={event} />
+            </motion.div>
+          ))
+        ) : (
+          <p className="text-muted-foreground text-sm py-4 text-center border border-dashed rounded-xl border-border">直近の予定はありません</p>
+        )}
       </motion.div>
     </section>
 
@@ -140,17 +191,17 @@ const Index = () => {
         ) : (
           publicNews.slice(0, 3).map((item, i) => (
             <motion.div key={item.id} custom={i} variants={fadeUp}>
-              <Link to={`/news/${item.id}`} className="group flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
-                <div className="flex-shrink-0">
-                  <span className="inline-block px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground">
+              <Link to={`/news/${item.id}`} className="group block p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${categoryColor[item.category] ?? categoryColor["その他"]}`}>
                     {item.category}
                   </span>
+                  {item.visibility === "member" && (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">部員限定</span>
+                  )}
+                  <span className="text-xs text-muted-foreground ml-auto">{item.date.replace("2026-", "").replace("-", "/")}</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">{item.title}</p>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1 hidden sm:block">{item.content.replace(/<[^>]*>/g, "")}</p>
-                </div>
-                <span className="text-xs text-muted-foreground flex-shrink-0">{item.date.replace("2026-", "").replace("-", "/")}</span>
+                <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">{item.title}</p>
               </Link>
             </motion.div>
           ))
