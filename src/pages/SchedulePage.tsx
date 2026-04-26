@@ -135,7 +135,7 @@ const SchedulePage = () => {
               selected={selectedDate}
               onSelect={setSelectedDate}
               modifiers={{ hasEvent: eventDates }}
-              modifiersStyles={{ hasEvent: { fontWeight: 700, color: "hsl(270 60% 52%)" } }}
+              modifiersStyles={{ hasEvent: { fontWeight: 600, color: "hsl(270 50% 68%)" } }}
               className="pointer-events-auto w-full"
             />
             {selectedDate && (
