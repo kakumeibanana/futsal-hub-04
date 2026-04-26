@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, ArrowRight, Bell, Users, Trophy, Target, Heart } from "lucide-react";
-import { motion } from "framer-motion";
+import { CalendarDays, ArrowRight, Bell, Users, Trophy, Target, Heart, X, Clock, MapPin, Info, Briefcase } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import ScheduleCard from "@/components/ScheduleCard";
 import { useNewsList } from "@/hooks/useNews";
@@ -25,6 +25,8 @@ interface HomeEvent {
   time: string;
   location: string;
   type: EventType;
+  detail: string;
+  belongings: string;
 }
 
 const d = new Date();
@@ -62,12 +64,13 @@ const Index = () => {
 
   const [homeEvents, setHomeEvents] = useState<HomeEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [selectedEvent, setSelectedEvent] = useState<HomeEvent | null>(null);
 
   useEffect(() => {
     const fetch = async () => {
       const { data } = await supabase
         .from("schedule_events")
-        .select("id, title, date, start_time, end_time, is_all_day, location, type")
+        .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
         .gte("date", today)
         .order("date", { ascending: true });
       const mapped: HomeEvent[] = (data ?? []).map((row) => {
@@ -77,7 +80,7 @@ const Index = () => {
           const end = row.end_time ? (row.end_time as string).slice(0, 5) : "";
           time = end ? `${start} - ${end}` : `${start}~`;
         }
-        return { id: row.id, title: row.title, date: row.date, time, location: row.location, type: row.type as EventType };
+        return { id: row.id, title: row.title, date: row.date, time, location: row.location, type: row.type as EventType, detail: row.detail ?? "", belongings: row.belongings ?? "" };
       });
       setHomeEvents(mapped);
       setEventsLoading(false);
@@ -151,7 +154,7 @@ const Index = () => {
         ) : todayEvents.length > 0 ? (
           <div className="space-y-3">
             {todayEvents.map((event, i) => (
-              <motion.div key={event.id} custom={i} variants={fadeUp}>
+              <motion.div key={event.id} custom={i} variants={fadeUp} onClick={() => setSelectedEvent(event)} className="cursor-pointer">
                 <ScheduleCard event={event} />
               </motion.div>
             ))}
@@ -170,7 +173,7 @@ const Index = () => {
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)
         ) : upcomingEvents.length > 0 ? (
           upcomingEvents.map((event, i) => (
-            <motion.div key={event.id} custom={i} variants={fadeUp}>
+            <motion.div key={event.id} custom={i} variants={fadeUp} onClick={() => setSelectedEvent(event)} className="cursor-pointer">
               <ScheduleCard event={event} />
             </motion.div>
           ))
@@ -252,6 +255,74 @@ const Index = () => {
         ))}
       </div>
     </section>
+    {/* 詳細モーダル */}
+    <AnimatePresence>
+      {selectedEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setSelectedEvent(null)}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl overflow-hidden border border-border"
+          >
+            <button
+              onClick={() => setSelectedEvent(null)}
+              className="absolute top-4 right-4 p-2 bg-muted/50 hover:bg-muted text-muted-foreground rounded-full transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-6 sm:p-8">
+              <div className="mb-4 inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
+                {selectedEvent.type === "match" ? "試合" : selectedEvent.type === "practice" ? "練習" : "イベント"}
+              </div>
+              <h2 className="text-2xl font-bold text-foreground mb-4">{selectedEvent.title}</h2>
+              <div className="space-y-3 pb-6 border-b border-border">
+                <div className="flex items-center gap-3 text-muted-foreground text-sm">
+                  <Clock size={18} className="text-primary/70 shrink-0" />
+                  <span>{selectedEvent.date.replace(/-/g, "/")} {selectedEvent.time}</span>
+                </div>
+                {selectedEvent.location && (
+                  <div className="flex items-center gap-3 text-muted-foreground text-sm">
+                    <MapPin size={18} className="text-primary/70 shrink-0" />
+                    <span>{selectedEvent.location}</span>
+                  </div>
+                )}
+              </div>
+              <div className="pt-6 space-y-6">
+                {selectedEvent.detail && (
+                  <div>
+                    <h3 className="flex items-center gap-2 font-bold text-foreground mb-2 text-sm">
+                      <Info size={18} className="text-primary" /> 詳細・時程
+                    </h3>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed bg-muted/30 p-4 rounded-xl">
+                      {selectedEvent.detail}
+                    </p>
+                  </div>
+                )}
+                {selectedEvent.belongings && (
+                  <div>
+                    <h3 className="flex items-center gap-2 font-bold text-foreground mb-2 text-sm">
+                      <Briefcase size={18} className="text-primary" /> 持ち物
+                    </h3>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed bg-muted/30 p-4 rounded-xl">
+                      {selectedEvent.belongings}
+                    </p>
+                  </div>
+                )}
+                {!selectedEvent.detail && !selectedEvent.belongings && (
+                  <p className="text-sm text-muted-foreground italic text-center py-4">詳細情報は登録されていません。</p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   </div>
   );
 };
