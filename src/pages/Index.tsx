@@ -34,8 +34,7 @@ const fadeUp = {
   visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.5 } }),
 };
 
-const stats = [
-  { icon: Users, label: "部員数", value: "17名" },
+const statsBase = [
   { icon: Trophy, label: "創部", value: "1996年" },
   { icon: Target, label: "活動日", value: "火、木、金、土" },
   { icon: Heart, label: "モットー", value: "楽しく勝つ" },
@@ -63,6 +62,7 @@ const Index = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<HomeEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<HomeEvent | null>(null);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
 
   useEffect(() => {
     const d = new Date();
@@ -79,8 +79,8 @@ const Index = () => {
         return { id: row.id, title: row.title, date: row.date, time, location: row.location, type: row.type as EventType, detail: row.detail ?? "", belongings: row.belongings ?? "" };
       });
 
-    const fetchEvents = async () => {
-      const [{ data: todayData }, { data: upcomingData }] = await Promise.all([
+    const fetchAll = async () => {
+      const [{ data: todayData }, { data: upcomingData }, { count }] = await Promise.all([
         supabase
           .from("schedule_events")
           .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
@@ -91,14 +91,24 @@ const Index = () => {
           .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
           .gt("date", todayStr)
           .order("date", { ascending: true }),
+        supabase
+          .from("members")
+          .select("*", { count: "exact", head: true })
+          .eq("hidden", false),
       ]);
       setTodayEvents(mapRows(todayData ?? []));
       setUpcomingEvents(mapRows(upcomingData ?? []));
+      if (count !== null) setMemberCount(count);
       setEventsLoading(false);
     };
 
-    fetchEvents();
+    fetchAll();
   }, []);
+
+  const stats = [
+    { icon: Users, label: "部員数", value: memberCount !== null ? `${memberCount}名` : "---" },
+    ...statsBase,
+  ];
 
   return (
   <div>
@@ -183,12 +193,12 @@ const Index = () => {
 
     {/* Upcoming */}
     <section className="container mt-12 sm:mt-16">
-      <SectionHeader icon={CalendarDays} title="直近の予定" />
+      <SectionHeader icon={CalendarDays} title="直近の予定" linkTo="/schedule" linkLabel="日程ページへ" />
       <div className="space-y-3">
         {eventsLoading ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)
         ) : upcomingEvents.length > 0 ? (
-          upcomingEvents.map((event, i) => (
+          upcomingEvents.slice(0, 5).map((event, i) => (
             <motion.div
               key={event.id}
               initial={{ opacity: 0, y: 12 }}
@@ -202,6 +212,11 @@ const Index = () => {
           ))
         ) : (
           <p className="text-muted-foreground text-sm py-4 text-center border border-dashed rounded-xl border-border">直近の予定はありません</p>
+        )}
+        {upcomingEvents.length > 5 && (
+          <Link to="/schedule" className="block text-center text-sm font-medium text-primary hover:underline pt-1 inline-flex items-center gap-1 justify-center w-full">
+            他{upcomingEvents.length - 5}件を見る <ArrowRight size={14} />
+          </Link>
         )}
       </div>
     </section>

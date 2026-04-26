@@ -20,6 +20,8 @@ const GalleryPage = () => {
   const [editingCaption, setEditingCaption] = useState(false);
   const [captionInput, setCaptionInput] = useState("");
   const [replaceUploading, setReplaceUploading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
+  const [pendingCaption, setPendingCaption] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +36,7 @@ const GalleryPage = () => {
 
   useEffect(() => { fetchImages(); }, []);
 
-  const handleUpload = async (files: FileList) => {
+  const handleUpload = async (files: FileList, caption: string) => {
     setUploading(true);
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop();
@@ -42,11 +44,18 @@ const GalleryPage = () => {
       const { error } = await supabase.storage.from("news-images").upload(path, file);
       if (!error) {
         const { data } = supabase.storage.from("news-images").getPublicUrl(path);
-        await supabase.from("gallery_images").insert({ url: data.publicUrl });
+        await supabase.from("gallery_images").insert({ url: data.publicUrl, caption: caption.trim() || null });
       }
     }
     await fetchImages();
     setUploading(false);
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!pendingFiles) return;
+    setPendingFiles(null);
+    await handleUpload(pendingFiles, pendingCaption);
+    setPendingCaption("");
   };
 
   const handleDelete = async (img: GalleryImage) => {
@@ -105,7 +114,7 @@ const GalleryPage = () => {
               accept="image/*"
               multiple
               className="hidden"
-              onChange={(e) => { if (e.target.files?.length) handleUpload(e.target.files); e.target.value = ""; }}
+              onChange={(e) => { if (e.target.files?.length) { setPendingFiles(e.target.files); setPendingCaption(""); } e.target.value = ""; }}
             />
           </>
         )}
@@ -225,6 +234,52 @@ const GalleryPage = () => {
               >
                 <X size={20} />
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* アップロード前キャプション入力 */}
+      <AnimatePresence>
+        {pendingFiles && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => { setPendingFiles(null); setPendingCaption(""); }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              className="relative w-full max-w-sm bg-card rounded-2xl shadow-2xl border border-border p-6"
+            >
+              <h3 className="font-bold text-foreground mb-1">キャプションを追加</h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                {pendingFiles.length}枚の写真をアップロードします（任意）
+              </p>
+              <input
+                autoFocus
+                value={pendingCaption}
+                onChange={(e) => setPendingCaption(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleConfirmUpload(); if (e.key === "Escape") { setPendingFiles(null); setPendingCaption(""); } }}
+                placeholder="例: 春季大会、練習風景..."
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 mb-4"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleConfirmUpload}
+                  className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  アップロード
+                </button>
+                <button
+                  onClick={() => { setPendingFiles(null); setPendingCaption(""); }}
+                  className="px-4 py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  キャンセル
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

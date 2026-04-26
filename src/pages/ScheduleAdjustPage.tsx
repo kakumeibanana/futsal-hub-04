@@ -762,8 +762,13 @@ const EventDetail = ({
 
       {/* 回答エリア */}
       <div className={`mb-8 ${submitted ? "p-4 rounded-xl border border-border bg-muted/20" : ""}`}>
-        <div className="text-sm font-semibold text-foreground mb-3">
-          {submitted ? "回答を変更する" : "参加可否を入力してください"}
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-semibold text-foreground">
+            {submitted ? "回答を変更する" : "参加可否を入力してください"}
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+            {memberName} として回答
+          </span>
         </div>
         {!submitted && (
           <div className="flex flex-wrap gap-3 mb-4">
