@@ -184,32 +184,39 @@ const Index = () => {
     {/* Upcoming */}
     <section className="container mt-12 sm:mt-16">
       <SectionHeader icon={CalendarDays} title="直近の予定" />
-      <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
+      <div className="space-y-3">
         {eventsLoading ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)
         ) : upcomingEvents.length > 0 ? (
           upcomingEvents.map((event, i) => (
-            <motion.div key={event.id} custom={i} variants={fadeUp} onClick={() => setSelectedEvent(event)} className="cursor-pointer">
+            <motion.div
+              key={event.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08, duration: 0.4 }}
+              onClick={() => setSelectedEvent(event)}
+              className="cursor-pointer"
+            >
               <ScheduleCard event={event} />
             </motion.div>
           ))
         ) : (
           <p className="text-muted-foreground text-sm py-4 text-center border border-dashed rounded-xl border-border">直近の予定はありません</p>
         )}
-      </motion.div>
+      </div>
     </section>
 
     {/* News */}
     <section id="news" className="container mt-12 sm:mt-16 scroll-mt-20">
       <SectionHeader icon={Bell} title="お知らせ" linkTo="/news" linkLabel="すべて見る" />
-      <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} className="space-y-3">
+      <div className="space-y-3">
         {newsLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-16 rounded-xl" />
           ))
         ) : (
           publicNews.slice(0, 3).map((item, i) => (
-            <motion.div key={item.id} custom={i} variants={fadeUp}>
+            <motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08, duration: 0.4 }}>
               <Link to={`/news/${item.id}`} className="group block p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${categoryColor[item.category] ?? categoryColor["その他"]}`}>
@@ -225,7 +232,7 @@ const Index = () => {
             </motion.div>
           ))
         )}
-      </motion.div>
+      </div>
     </section>
 
     {/* About section */}
