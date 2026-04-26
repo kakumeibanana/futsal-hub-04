@@ -155,7 +155,7 @@ const Index = () => {
           <CalendarDays size={20} className="text-primary" />
           <h2 className="font-display font-bold text-lg sm:text-xl text-foreground">今日の予定</h2>
           <span className="ml-auto text-xs sm:text-sm text-muted-foreground font-medium">
-            {new Date(today).toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" })}
+            {new Date().toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" })}
           </span>
         </div>
         {eventsLoading ? (
