@@ -89,7 +89,7 @@ const Index = () => {
   }, []);
 
   const todayEvents = homeEvents.filter((e) => e.date === today);
-  const upcomingEvents = homeEvents.filter((e) => e.date >= today);
+  const upcomingEvents = homeEvents.filter((e) => e.date > today);
 
   return (
   <div>
