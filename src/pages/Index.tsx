@@ -80,8 +80,7 @@ const Index = () => {
       });
 
     const fetchEvents = async () => {
-      console.log('[DEBUG] todayStr:', todayStr);
-      const [{ data: todayData, error: todayErr }, { data: upcomingData }] = await Promise.all([
+      const [{ data: todayData }, { data: upcomingData }] = await Promise.all([
         supabase
           .from("schedule_events")
           .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
@@ -93,7 +92,6 @@ const Index = () => {
           .gt("date", todayStr)
           .order("date", { ascending: true }),
       ]);
-      console.log('[DEBUG] todayData:', todayData, 'error:', todayErr);
       setTodayEvents(mapRows(todayData ?? []));
       setUpcomingEvents(mapRows(upcomingData ?? []));
       setEventsLoading(false);
@@ -165,7 +163,14 @@ const Index = () => {
         ) : todayEvents.length > 0 ? (
           <div className="space-y-3">
             {todayEvents.map((event, i) => (
-              <motion.div key={event.id} custom={i} variants={fadeUp} onClick={() => setSelectedEvent(event)} className="cursor-pointer">
+              <motion.div
+                key={event.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.08, duration: 0.4 }}
+                onClick={() => setSelectedEvent(event)}
+                className="cursor-pointer"
+              >
                 <ScheduleCard event={event} />
               </motion.div>
             ))}
