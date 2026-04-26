@@ -80,7 +80,8 @@ const Index = () => {
       });
 
     const fetchEvents = async () => {
-      const [{ data: todayData }, { data: upcomingData }] = await Promise.all([
+      console.log('[DEBUG] todayStr:', todayStr);
+      const [{ data: todayData, error: todayErr }, { data: upcomingData }] = await Promise.all([
         supabase
           .from("schedule_events")
           .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
@@ -92,6 +93,7 @@ const Index = () => {
           .gt("date", todayStr)
           .order("date", { ascending: true }),
       ]);
+      console.log('[DEBUG] todayData:', todayData, 'error:', todayErr);
       setTodayEvents(mapRows(todayData ?? []));
       setUpcomingEvents(mapRows(upcomingData ?? []));
       setEventsLoading(false);
