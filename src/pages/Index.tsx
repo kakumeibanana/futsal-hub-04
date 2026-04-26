@@ -29,9 +29,6 @@ interface HomeEvent {
   belongings: string;
 }
 
-const d = new Date();
-const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
   visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.5 } }),
@@ -62,18 +59,17 @@ const Index = () => {
   const { data: allNews = [], isLoading: newsLoading } = useNewsList();
   const publicNews = allNews.filter((n) => n.visibility === "public");
 
-  const [homeEvents, setHomeEvents] = useState<HomeEvent[]>([]);
+  const [todayEvents, setTodayEvents] = useState<HomeEvent[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<HomeEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<HomeEvent | null>(null);
 
   useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase
-        .from("schedule_events")
-        .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
-        .gte("date", today)
-        .order("date", { ascending: true });
-      const mapped: HomeEvent[] = (data ?? []).map((row) => {
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const mapRows = (rows: any[]): HomeEvent[] =>
+      rows.map((row) => {
         let time = "終日";
         if (!row.is_all_day && row.start_time) {
           const start = (row.start_time as string).slice(0, 5);
@@ -82,14 +78,27 @@ const Index = () => {
         }
         return { id: row.id, title: row.title, date: row.date, time, location: row.location, type: row.type as EventType, detail: row.detail ?? "", belongings: row.belongings ?? "" };
       });
-      setHomeEvents(mapped);
+
+    const fetchEvents = async () => {
+      const [{ data: todayData }, { data: upcomingData }] = await Promise.all([
+        supabase
+          .from("schedule_events")
+          .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
+          .eq("date", todayStr)
+          .order("date", { ascending: true }),
+        supabase
+          .from("schedule_events")
+          .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
+          .gt("date", todayStr)
+          .order("date", { ascending: true }),
+      ]);
+      setTodayEvents(mapRows(todayData ?? []));
+      setUpcomingEvents(mapRows(upcomingData ?? []));
       setEventsLoading(false);
     };
-    fetch();
-  }, []);
 
-  const todayEvents = homeEvents.filter((e) => e.date === today);
-  const upcomingEvents = homeEvents.filter((e) => e.date > today);
+    fetchEvents();
+  }, []);
 
   return (
   <div>
