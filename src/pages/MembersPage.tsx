@@ -198,7 +198,7 @@ const MemberForm = ({
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="笹谷 奏太" className="h-10 border-purple-200 focus-visible:ring-purple-500 rounded-lg" />
         </div>
         <div>
-          <label className="text-xs font-bold text-purple-900 mb-1 block">背番号</label>
+          <label className="text-xs font-bold text-purple-900 mb-1 block">背番号 <span className="font-normal text-purple-400">（任意）</span></label>
           <Input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="23" type="number" className="h-10 border-purple-200 focus-visible:ring-purple-500 rounded-lg font-bold" />
         </div>
       </div>
@@ -209,7 +209,7 @@ const MemberForm = ({
       </div>
 
       <div>
-        <label className="text-xs font-bold text-purple-900 mb-1.5 block">ポジション</label>
+        <label className="text-xs font-bold text-purple-900 mb-1.5 block">ポジション <span className="font-normal text-purple-400">（任意）</span></label>
         <div className="flex flex-wrap gap-1.5">
           {POSITIONS.map((p) => (
             <button
