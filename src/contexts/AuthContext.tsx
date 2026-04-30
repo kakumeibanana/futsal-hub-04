@@ -60,12 +60,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     if (error) return { error: "パスワードが間違っています" };
 
-    // membersテーブルと照合
-    const { data: member } = await supabase
-      .from("members")
-      .select("role")
-      .eq("name", name.trim())
-      .single();
+    // スペース正規化（全角・半角・複数スペース → 除去して比較）
+    const toKey = (s: string) => s.replace(/[\s　]+/g, "").trim();
+    const inputKey = toKey(name);
+
+    const { data: members } = await supabase.from("members").select("name, role");
+    const member = members?.find((m) => toKey(m.name) === inputKey);
 
     if (!member) {
       await supabase.auth.signOut();
@@ -73,9 +73,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const memberRole = member.role as Role;
-    localStorage.setItem(MEMBER_NAME_KEY, name.trim());
+    localStorage.setItem(MEMBER_NAME_KEY, member.name);
     localStorage.setItem(MEMBER_ROLE_KEY, memberRole ?? "member");
-    setMemberName(name.trim());
+    setMemberName(member.name);
     setRole(memberRole);
     return { error: null };
   };
