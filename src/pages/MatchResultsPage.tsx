@@ -101,9 +101,11 @@ const MatchResultsPage = () => {
   const [fScoreUs, setFScoreUs] = useState(0);
   const [fScoreThem, setFScoreThem] = useState(0);
   const [fVideoId, setFVideoId] = useState<string>("");
-  const [fScorers, setFScorers] = useState<{ member_name: string; type: "goal" | "assist" }[]>([]);
+  const [fScorers, setFScorers] = useState<{ member_name: string; type: "goal" | "assist"; is_guest?: boolean }[]>([]);
   const [fScorerMember, setFScorerMember] = useState("");
   const [fScorerType, setFScorerType] = useState<"goal" | "assist">("goal");
+  const [fScorerIsGuest, setFScorerIsGuest] = useState(false);
+  const [fScorerGuestName, setFScorerGuestName] = useState("");
   const [formLoading, setFormLoading] = useState(false);
 
   const fetchMatches = useCallback(async () => {
@@ -455,21 +457,43 @@ const MatchResultsPage = () => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-foreground mb-2 block">得点者・アシスト</label>
+                    <div className="flex rounded-lg border border-border overflow-hidden mb-2 w-fit">
+                      <button type="button" onClick={() => { setFScorerIsGuest(false); setFScorerGuestName(""); }} className={`px-3 py-1.5 text-xs font-semibold transition-colors ${!fScorerIsGuest ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>部員</button>
+                      <button type="button" onClick={() => setFScorerIsGuest(true)} className={`px-3 py-1.5 text-xs font-semibold transition-colors ${fScorerIsGuest ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>助っ人</button>
+                    </div>
                     <div className="flex gap-2 mb-2">
-                      <select value={fScorerMember} onChange={(e) => setFScorerMember(e.target.value)} className={`flex-1 ${inputClass}`}>
-                        {members.map((m) => <option key={m} value={m}>{m}</option>)}
-                      </select>
+                      {fScorerIsGuest ? (
+                        <input type="text" value={fScorerGuestName} onChange={(e) => setFScorerGuestName(e.target.value)} placeholder="名前を入力" className={`flex-1 ${inputClass}`} />
+                      ) : (
+                        <select value={fScorerMember} onChange={(e) => setFScorerMember(e.target.value)} className={`flex-1 ${inputClass}`}>
+                          {members.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      )}
                       <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
                         <button type="button" onClick={() => setFScorerType("goal")} className={`px-2.5 py-2 text-xs font-semibold transition-colors ${fScorerType === "goal" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>⚽</button>
                         <button type="button" onClick={() => setFScorerType("assist")} className={`px-2.5 py-2 text-xs font-semibold transition-colors ${fScorerType === "assist" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>🤝</button>
                       </div>
-                      <button type="button" onClick={() => { if (fScorerMember) setFScorers((prev) => [...prev, { member_name: fScorerMember, type: fScorerType }]); }} className="px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"><Plus size={14} /></button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const name = fScorerIsGuest ? fScorerGuestName.trim() : fScorerMember;
+                          if (!name) return;
+                          setFScorers((prev) => [...prev, { member_name: name, type: fScorerType, is_guest: fScorerIsGuest }]);
+                          if (fScorerIsGuest) setFScorerGuestName("");
+                        }}
+                        className="px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                      >
+                        <Plus size={14} />
+                      </button>
                     </div>
                     {fScorers.length > 0 && (
                       <div className="space-y-1.5">
                         {fScorers.map((s, i) => (
                           <div key={i} className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-1.5">
-                            <span className="text-sm text-foreground">{s.type === "goal" ? "⚽" : "🤝"} {s.member_name}</span>
+                            <span className="text-sm text-foreground">
+                              {s.type === "goal" ? "⚽" : "🤝"} {s.member_name}
+                              {s.is_guest && <span className="ml-1.5 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">助っ人</span>}
+                            </span>
                             <button type="button" onClick={() => setFScorers((prev) => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-red-500 transition-colors"><X size={14} /></button>
                           </div>
                         ))}

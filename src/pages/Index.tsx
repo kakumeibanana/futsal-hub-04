@@ -231,38 +231,38 @@ const Index = () => {
     </section>
 
     {/* Recent match results */}
-    {(matchesLoading || recentMatches.length > 0) && (
-      <section className="container mt-12 sm:mt-16">
-        <SectionHeader icon={Swords} title="直近の試合結果" linkTo="/match-results" linkLabel="すべて見る" />
-        <div className="space-y-3">
-          {matchesLoading ? (
-            Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
-          ) : (
-            recentMatches.map((match, i) => {
-              const result = match.score_us > match.score_them ? "win" : match.score_us < match.score_them ? "loss" : "draw";
-              const resultLabel = result === "win" ? "勝利" : result === "loss" ? "敗北" : "引き分け";
-              const resultColor = result === "win" ? "bg-green-100 text-green-700" : result === "loss" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700";
-              return (
-                <motion.div key={match.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08, duration: 0.4 }}>
-                  <Link to="/match-results" className="group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
-                    <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold ${resultColor}`}>{resultLabel}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
-                        {match.title || `vs ${match.opponent}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{match.opponent} 戦・{match.match_date.replace(/-/g, "/")}</p>
-                    </div>
-                    <div className="shrink-0 font-display font-black text-lg sm:text-xl text-foreground tabular-nums">
-                      {match.score_us} <span className="text-muted-foreground font-normal text-sm">-</span> {match.score_them}
-                    </div>
-                  </Link>
-                </motion.div>
-              );
-            })
-          )}
-        </div>
-      </section>
-    )}
+    <section className="container mt-12 sm:mt-16">
+      <SectionHeader icon={Swords} title="直近の試合結果" linkTo="/match-results" linkLabel="すべて見る" />
+      <div className="space-y-3">
+        {matchesLoading ? (
+          Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
+        ) : recentMatches.length === 0 ? (
+          <p className="text-muted-foreground text-sm py-4 text-center border border-dashed rounded-xl border-border">試合結果はまだありません</p>
+        ) : (
+          recentMatches.map((match, i) => {
+            const result = match.score_us > match.score_them ? "win" : match.score_us < match.score_them ? "loss" : "draw";
+            const resultLabel = result === "win" ? "勝利" : result === "loss" ? "敗北" : "引き分け";
+            const resultColor = result === "win" ? "bg-green-100 text-green-700" : result === "loss" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700";
+            return (
+              <motion.div key={match.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08, duration: 0.4 }}>
+                <Link to="/match-results" className="group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card hover:shadow-primary transition-all duration-300">
+                  <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold ${resultColor}`}>{resultLabel}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                      {match.title || `vs ${match.opponent}`}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{match.opponent} 戦・{match.match_date.replace(/-/g, "/")}</p>
+                  </div>
+                  <div className="shrink-0 font-display font-black text-lg sm:text-xl text-foreground tabular-nums">
+                    {match.score_us} <span className="text-muted-foreground font-normal text-sm">-</span> {match.score_them}
+                  </div>
+                </Link>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+    </section>
 
     {/* News */}
     <section id="news" className="container mt-12 sm:mt-16 scroll-mt-20">
