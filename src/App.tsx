@@ -18,6 +18,7 @@ import VideosPage from "./pages/VideosPage";
 import GalleryPage from "./pages/GalleryPage";
 import NotFound from "./pages/NotFound";
 import MembersPage from "./pages/MembersPage";
+import MatchResultsPage from "./pages/MatchResultsPage";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/videos" element={<ProtectedRoute><VideosPage /></ProtectedRoute>} />
               <Route path="/gallery" element={<ProtectedRoute><GalleryPage /></ProtectedRoute>} />
               <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
+              <Route path="/match-results" element={<ProtectedRoute><MatchResultsPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>

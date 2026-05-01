@@ -11,6 +11,7 @@ import futsalLogo from "@/assets/futsalclubnew.jpg";
 const memberLinks = [
   { to: "/schedule", label: "日程" },
   { to: "/adjust", label: "日程調整" },
+  { to: "/match-results", label: "試合結果" },
   { to: "/members", label: "メンバー" },
   { to: "/news", label: "お知らせ" },
   { to: "/videos", label: "動画" },
