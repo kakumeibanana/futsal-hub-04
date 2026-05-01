@@ -1,0 +1,19 @@
+name: 試合結果記録リマインダー通知
+
+on:
+  schedule:
+    # 毎日 20:00 JST = 11:00 UTC
+    - cron: '0 11 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  send-match-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Edge Function を呼び出す
+        run: |
+          curl -s -X POST \
+            "https://vbtzittxpdojuqjzsthv.supabase.co/functions/v1/send-match-reminder" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'

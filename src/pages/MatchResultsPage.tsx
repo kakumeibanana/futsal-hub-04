@@ -13,7 +13,7 @@ interface MatchResult {
   match_date: string;
   score_us: number;
   score_them: number;
-  youtube_url: string | null;
+  video_id: string | null;
 }
 
 interface MatchScorer {
@@ -31,8 +31,20 @@ interface MatchComment {
   likes: { member_name: string }[];
 }
 
-function getYouTubeId(url: string): string | null {
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+interface VideoItem {
+  id: string;
+  title: string;
+  type: "youtube" | "drive" | "upload";
+  url: string;
+}
+
+function extractYoutubeId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+function extractDriveId(url: string): string | null {
+  const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   return m ? m[1] : null;
 }
 
@@ -45,7 +57,25 @@ function getResult(us: number, them: number) {
 function formatDate(dateStr: string) {
   const [y, mo, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, mo - 1, d);
-  return { label: `${mo}/${d}(${DAY_NAMES[dt.getDay()]})`, dt };
+  return `${mo}/${d}(${DAY_NAMES[dt.getDay()]})`;
+}
+
+function VideoPlayer({ video }: { video: VideoItem }) {
+  const ytId = video.type === "youtube" ? extractYoutubeId(video.url) : null;
+  const driveId = video.type === "drive" ? extractDriveId(video.url) : null;
+  return (
+    <div className="rounded-xl overflow-hidden aspect-video mb-4">
+      {ytId && (
+        <iframe src={`https://www.youtube.com/embed/${ytId}`} className="w-full h-full" allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" />
+      )}
+      {driveId && (
+        <iframe src={`https://drive.google.com/file/d/${driveId}/preview`} className="w-full h-full" allowFullScreen />
+      )}
+      {video.type === "upload" && (
+        <video src={video.url} className="w-full h-full bg-black" controls />
+      )}
+    </div>
+  );
 }
 
 const MatchResultsPage = () => {
@@ -53,6 +83,7 @@ const MatchResultsPage = () => {
 
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [videoList, setVideoList] = useState<VideoItem[]>([]);
 
   const [selectedMatch, setSelectedMatch] = useState<MatchResult | null>(null);
   const [scorers, setScorers] = useState<MatchScorer[]>([]);
@@ -69,7 +100,7 @@ const MatchResultsPage = () => {
   const [fDate, setFDate] = useState("");
   const [fScoreUs, setFScoreUs] = useState(0);
   const [fScoreThem, setFScoreThem] = useState(0);
-  const [fYoutube, setFYoutube] = useState("");
+  const [fVideoId, setFVideoId] = useState<string>("");
   const [fScorers, setFScorers] = useState<{ member_name: string; type: "goal" | "assist" }[]>([]);
   const [fScorerMember, setFScorerMember] = useState("");
   const [fScorerType, setFScorerType] = useState<"goal" | "assist">("goal");
@@ -79,13 +110,18 @@ const MatchResultsPage = () => {
     setLoading(true);
     const { data } = await supabase
       .from("match_results")
-      .select("id, title, opponent, match_date, score_us, score_them, youtube_url")
+      .select("id, title, opponent, match_date, score_us, score_them, video_id")
       .order("match_date", { ascending: false });
     setMatches(data ?? []);
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchMatches(); }, [fetchMatches]);
+  useEffect(() => {
+    fetchMatches();
+    supabase.from("videos").select("id, title, type, url").order("date", { ascending: false }).then(({ data }) => {
+      setVideoList(data ?? []);
+    });
+  }, [fetchMatches]);
 
   const fetchDetail = async (match: MatchResult) => {
     setSelectedMatch(match);
@@ -112,8 +148,7 @@ const MatchResultsPage = () => {
   };
 
   const refreshComments = async (matchId: string) => {
-    const { data: commentData } = await supabase
-      .from("match_comments").select("*").eq("match_id", matchId).order("created_at");
+    const { data: commentData } = await supabase.from("match_comments").select("*").eq("match_id", matchId).order("created_at");
     const commentIds = (commentData ?? []).map((c) => c.id);
     const { data: likeData } = commentIds.length > 0
       ? await supabase.from("match_likes").select("comment_id, member_name").in("comment_id", commentIds)
@@ -140,11 +175,7 @@ const MatchResultsPage = () => {
   const handleComment = async () => {
     if (!newComment.trim() || !memberName || !selectedMatch) return;
     setCommentLoading(true);
-    await supabase.from("match_comments").insert({
-      match_id: selectedMatch.id,
-      member_name: memberName,
-      body: newComment.trim(),
-    });
+    await supabase.from("match_comments").insert({ match_id: selectedMatch.id, member_name: memberName, body: newComment.trim() });
     setNewComment("");
     await refreshComments(selectedMatch.id);
     setCommentLoading(false);
@@ -171,12 +202,12 @@ const MatchResultsPage = () => {
       setFDate(match.match_date);
       setFScoreUs(match.score_us);
       setFScoreThem(match.score_them);
-      setFYoutube(match.youtube_url ?? "");
+      setFVideoId(match.video_id ?? "");
       const { data } = await supabase.from("match_scorers").select("*").eq("match_id", match.id).order("display_order");
       setFScorers((data ?? []).map((s) => ({ member_name: s.member_name, type: s.type as "goal" | "assist" })));
     } else {
       setFTitle(""); setFOpponent(""); setFDate("");
-      setFScoreUs(0); setFScoreThem(0); setFYoutube(""); setFScorers([]);
+      setFScoreUs(0); setFScoreThem(0); setFVideoId(""); setFScorers([]);
     }
     const { data: memberData } = await supabase.from("members").select("name").order("name");
     const names = (memberData ?? []).map((m) => m.name);
@@ -191,19 +222,20 @@ const MatchResultsPage = () => {
     setFormLoading(true);
     try {
       let matchId: string;
+      const fields = {
+        title: fTitle || null,
+        opponent: fOpponent,
+        match_date: fDate,
+        score_us: fScoreUs,
+        score_them: fScoreThem,
+        video_id: fVideoId || null,
+      };
       if (editingMatch) {
-        await supabase.from("match_results").update({
-          title: fTitle || null, opponent: fOpponent, match_date: fDate,
-          score_us: fScoreUs, score_them: fScoreThem, youtube_url: fYoutube || null,
-        }).eq("id", editingMatch.id);
+        await supabase.from("match_results").update(fields).eq("id", editingMatch.id);
         matchId = editingMatch.id;
         await supabase.from("match_scorers").delete().eq("match_id", matchId);
       } else {
-        const { data } = await supabase.from("match_results").insert({
-          title: fTitle || null, opponent: fOpponent, match_date: fDate,
-          score_us: fScoreUs, score_them: fScoreThem, youtube_url: fYoutube || null,
-          created_by: memberName,
-        }).select().single();
+        const { data } = await supabase.from("match_results").insert({ ...fields, created_by: memberName }).select().single();
         matchId = data!.id;
       }
       if (fScorers.length > 0) {
@@ -220,6 +252,8 @@ const MatchResultsPage = () => {
 
   const inputClass = "w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50";
 
+  const selectedVideo = selectedMatch?.video_id ? videoList.find((v) => v.id === selectedMatch.video_id) ?? null : null;
+
   return (
     <div className="container py-10">
       <div className="flex items-center justify-between mb-8">
@@ -229,10 +263,7 @@ const MatchResultsPage = () => {
           試合結果
         </h1>
         {isStaff && (
-          <button
-            onClick={() => openForm(null)}
-            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors"
-          >
+          <button onClick={() => openForm(null)} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors">
             <Plus size={14} />
             <span className="hidden sm:inline">結果を追加</span>
             <span className="sm:hidden">追加</span>
@@ -241,18 +272,13 @@ const MatchResultsPage = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="animate-spin text-primary" />
-        </div>
+        <div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin text-primary" /></div>
       ) : matches.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground text-sm border border-dashed rounded-xl border-border bg-card/50">
-          試合結果はまだありません
-        </div>
+        <div className="text-center py-16 text-muted-foreground text-sm border border-dashed rounded-xl border-border bg-card/50">試合結果はまだありません</div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {matches.map((match, i) => {
             const result = getResult(match.score_us, match.score_them);
-            const { label: dateLabel, dt } = formatDate(match.match_date);
             return (
               <motion.div
                 key={match.id}
@@ -263,7 +289,7 @@ const MatchResultsPage = () => {
                 className="cursor-pointer bg-card border border-border rounded-2xl p-5 hover:-translate-y-1 transition-transform duration-200"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                  <span className="text-xs text-muted-foreground">{formatDate(match.match_date)}</span>
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${result.bg} ${result.text} ${result.border}`}>{result.label}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">vs {match.opponent}</p>
@@ -293,14 +319,8 @@ const MatchResultsPage = () => {
               <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
                 {isStaff && (
                   <>
-                    <button
-                      onClick={() => { const m = selectedMatch; setSelectedMatch(null); openForm(m); }}
-                      className="p-2 bg-muted/80 hover:bg-muted text-muted-foreground rounded-full transition-colors"
-                    ><Edit2 size={16} /></button>
-                    <button
-                      onClick={() => handleDelete(selectedMatch.id)}
-                      className="p-2 bg-muted/80 hover:bg-red-100 text-muted-foreground hover:text-red-600 rounded-full transition-colors"
-                    ><Trash2 size={16} /></button>
+                    <button onClick={() => { const m = selectedMatch; setSelectedMatch(null); openForm(m); }} className="p-2 bg-muted/80 hover:bg-muted text-muted-foreground rounded-full transition-colors"><Edit2 size={16} /></button>
+                    <button onClick={() => handleDelete(selectedMatch.id)} className="p-2 bg-muted/80 hover:bg-red-100 text-muted-foreground hover:text-red-600 rounded-full transition-colors"><Trash2 size={16} /></button>
                   </>
                 )}
                 <button onClick={() => setSelectedMatch(null)} className="p-2 bg-muted/50 hover:bg-muted text-muted-foreground rounded-full transition-colors"><X size={20} /></button>
@@ -308,59 +328,37 @@ const MatchResultsPage = () => {
 
               <div className="p-6 sm:p-8">
                 {detailLoading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <Loader2 size={28} className="animate-spin text-primary" />
-                  </div>
+                  <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-primary" /></div>
                 ) : (
                   <>
-                    {/* ヘッダー */}
                     <div className="mb-4">
                       {selectedMatch.title && <p className="text-xs text-muted-foreground mb-1">{selectedMatch.title}</p>}
                       <div className="flex items-center gap-3 mb-1">
-                        <span className="text-sm text-muted-foreground">{formatDate(selectedMatch.match_date).label}</span>
+                        <span className="text-sm text-muted-foreground">{formatDate(selectedMatch.match_date)}</span>
                         {(() => { const r = getResult(selectedMatch.score_us, selectedMatch.score_them); return <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${r.bg} ${r.text} ${r.border}`}>{r.label}</span>; })()}
                       </div>
                       <p className="text-xl font-bold text-foreground">vs {selectedMatch.opponent}</p>
                     </div>
 
-                    {/* スコア */}
                     <div className="flex items-baseline gap-4 mb-4">
                       <span className="text-7xl font-black text-foreground">{selectedMatch.score_us}</span>
                       <span className="text-3xl text-muted-foreground font-light">-</span>
                       <span className="text-7xl font-black text-foreground">{selectedMatch.score_them}</span>
                     </div>
 
-                    {/* 得点者・アシスト */}
                     {scorers.length > 0 && (
-                      <div className="mb-4 space-y-1 bg-muted/30 rounded-xl p-3">
+                      <div className="mb-4 bg-muted/30 rounded-xl p-3 space-y-1">
                         {scorers.filter((s) => s.type === "goal").length > 0 && (
-                          <p className="text-sm text-foreground">
-                            <span className="mr-2">⚽</span>
-                            {scorers.filter((s) => s.type === "goal").map((s) => s.member_name).join("　")}
-                          </p>
+                          <p className="text-sm text-foreground"><span className="mr-2">⚽</span>{scorers.filter((s) => s.type === "goal").map((s) => s.member_name).join("　")}</p>
                         )}
                         {scorers.filter((s) => s.type === "assist").length > 0 && (
-                          <p className="text-sm text-foreground">
-                            <span className="mr-2">🤝</span>
-                            {scorers.filter((s) => s.type === "assist").map((s) => s.member_name).join("　")}
-                          </p>
+                          <p className="text-sm text-foreground"><span className="mr-2">🤝</span>{scorers.filter((s) => s.type === "assist").map((s) => s.member_name).join("　")}</p>
                         )}
                       </div>
                     )}
 
-                    {/* YouTube */}
-                    {selectedMatch.youtube_url && getYouTubeId(selectedMatch.youtube_url) && (
-                      <div className="mb-4 rounded-xl overflow-hidden aspect-video">
-                        <iframe
-                          src={`https://www.youtube.com/embed/${getYouTubeId(selectedMatch.youtube_url)}`}
-                          className="w-full h-full"
-                          allowFullScreen
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        />
-                      </div>
-                    )}
+                    {selectedVideo && <VideoPlayer video={selectedVideo} />}
 
-                    {/* コメント */}
                     <div className="border-t border-border pt-4 mt-2">
                       <h3 className="text-sm font-semibold text-foreground mb-3">コメント</h3>
                       <div className="space-y-2 mb-3 max-h-60 overflow-y-auto">
@@ -373,10 +371,7 @@ const MatchResultsPage = () => {
                               <div className="flex items-center justify-between mb-1">
                                 <span className="text-xs font-semibold text-foreground">{comment.member_name}</span>
                                 <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleLike(comment.id)}
-                                    className={`flex items-center gap-1 text-xs transition-colors ${liked ? "text-red-500" : "text-muted-foreground hover:text-red-500"}`}
-                                  >
+                                  <button onClick={() => handleLike(comment.id)} className={`flex items-center gap-1 text-xs transition-colors ${liked ? "text-red-500" : "text-muted-foreground hover:text-red-500"}`}>
                                     <Heart size={12} fill={liked ? "currentColor" : "none"} />
                                     {comment.likes.length > 0 && <span>{comment.likes.length}</span>}
                                   </button>
@@ -399,11 +394,7 @@ const MatchResultsPage = () => {
                           placeholder="コメントを入力..."
                           className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                         />
-                        <button
-                          onClick={handleComment}
-                          disabled={!newComment.trim() || commentLoading}
-                          className="px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                        >
+                        <button onClick={handleComment} disabled={!newComment.trim() || commentLoading} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
                           {commentLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                         </button>
                       </div>
@@ -454,8 +445,13 @@ const MatchResultsPage = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-foreground mb-1 block">YouTube URL（任意）</label>
-                    <input type="url" value={fYoutube} onChange={(e) => setFYoutube(e.target.value)} placeholder="https://youtube.com/watch?v=..." className={inputClass} />
+                    <label className="text-sm font-medium text-foreground mb-1 block">動画</label>
+                    <select value={fVideoId} onChange={(e) => setFVideoId(e.target.value)} className={inputClass}>
+                      <option value="">動画なし</option>
+                      {videoList.map((v) => (
+                        <option key={v.id} value={v.id}>{v.title}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-foreground mb-2 block">得点者・アシスト</label>
@@ -467,11 +463,7 @@ const MatchResultsPage = () => {
                         <button type="button" onClick={() => setFScorerType("goal")} className={`px-2.5 py-2 text-xs font-semibold transition-colors ${fScorerType === "goal" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>⚽</button>
                         <button type="button" onClick={() => setFScorerType("assist")} className={`px-2.5 py-2 text-xs font-semibold transition-colors ${fScorerType === "assist" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>🤝</button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => { if (fScorerMember) setFScorers((prev) => [...prev, { member_name: fScorerMember, type: fScorerType }]); }}
-                        className="px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                      ><Plus size={14} /></button>
+                      <button type="button" onClick={() => { if (fScorerMember) setFScorers((prev) => [...prev, { member_name: fScorerMember, type: fScorerType }]); }} className="px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"><Plus size={14} /></button>
                     </div>
                     {fScorers.length > 0 && (
                       <div className="space-y-1.5">
