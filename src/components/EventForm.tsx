@@ -14,6 +14,8 @@ interface InitialValues {
   type?: "match" | "practice" | "event";
   detail?: string;
   belongings?: string;
+  lineNotify?: "none" | "immediate" | "scheduled";
+  lineSendAt?: string;
 }
 
 interface EventFormProps {
@@ -38,8 +40,8 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
   const [type, setType] = useState<"match" | "practice" | "event">(initialValues?.type ?? "practice");
   const [detail, setDetail] = useState(initialValues?.detail ?? "");
   const [belongings, setBelongings] = useState(initialValues?.belongings ?? "");
-  const [lineNotify, setLineNotify] = useState<"none" | "immediate" | "scheduled">("none");
-  const [lineSendAt, setLineSendAt] = useState("");
+  const [lineNotify, setLineNotify] = useState<"none" | "immediate" | "scheduled">(initialValues?.lineNotify ?? "none");
+  const [lineSendAt, setLineSendAt] = useState(initialValues?.lineSendAt ?? "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

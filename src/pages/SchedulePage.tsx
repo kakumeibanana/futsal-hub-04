@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePushNotification } from "@/hooks/usePushNotification";
 
+const BELONGINGS = "フットサルできる服、水筒、トレシュー、タオル、着替え";
+
 // 曜日ごとの固定テンプレート（日曜=0, 月曜=1, ...）
 const PRACTICE_TEMPLATES: Record<number, { startTime: string; endTime: string }> = {
   2: { startTime: "15:15", endTime: "17:30" }, // 火曜
@@ -54,7 +56,9 @@ const SchedulePage = () => {
   const [duplicateValues, setDuplicateValues] = useState<MappedEvent | null>(null);
   const [editingEvent, setEditingEvent] = useState<MappedEvent | null>(null);
   const [notificationTemplate, setNotificationTemplate] = useState<{
-    title: string; date: string; startTime: string; endTime: string; type: "practice";
+    title: string; date: string; startTime: string; endTime: string;
+    type: "practice"; location: string; belongings: string;
+    lineNotify: "scheduled"; lineSendAt: string;
   } | null>(null);
 
   const fetchSchedules = useCallback(async () => {
@@ -110,12 +114,21 @@ const SchedulePage = () => {
     const dayOfWeek = d.getDay();
     const template = PRACTICE_TEMPLATES[dayOfWeek];
     if (template) {
+      // 練習前日の20:00をLINE予約配信時刻として計算
+      const prevDay = new Date(d);
+      prevDay.setDate(prevDay.getDate() - 1);
+      const prevDayStr = prevDay.toISOString().split("T")[0];
+
       setNotificationTemplate({
         title: "練習",
         date: practiceDate,
         startTime: template.startTime,
         endTime: template.endTime,
         type: "practice",
+        location: "コート面",
+        belongings: BELONGINGS,
+        lineNotify: "scheduled",
+        lineSendAt: `${prevDayStr}T20:00`,
       });
       setShowForm(true);
     }
@@ -403,6 +416,10 @@ const SchedulePage = () => {
               startTime: notificationTemplate.startTime,
               endTime: notificationTemplate.endTime,
               type: notificationTemplate.type,
+              location: notificationTemplate.location,
+              belongings: notificationTemplate.belongings,
+              lineNotify: notificationTemplate.lineNotify,
+              lineSendAt: notificationTemplate.lineSendAt,
             } : duplicateValues ? {
               title: duplicateValues.title,
               isAllDay: duplicateValues.time === "終日",
