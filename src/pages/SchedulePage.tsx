@@ -1,14 +1,24 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Calendar } from "@/components/ui/calendar";
 import ScheduleCard from "@/components/ScheduleCard";
 import EventForm from "@/components/EventForm";
 import {
   CalendarDays, Loader2, AlertCircle,
-  X, MapPin, Clock, Info, Briefcase, Plus, Edit2, Trash2,
+  X, MapPin, Clock, Info, Briefcase, Plus, Edit2, Trash2, Bell, BellOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePushNotification } from "@/hooks/usePushNotification";
+
+// 曜日ごとの固定テンプレート（日曜=0, 月曜=1, ...）
+const PRACTICE_TEMPLATES: Record<number, { startTime: string; endTime: string }> = {
+  2: { startTime: "15:15", endTime: "17:30" }, // 火曜
+  4: { startTime: "15:15", endTime: "17:30" }, // 木曜
+  5: { startTime: "15:15", endTime: "17:30" }, // 金曜
+  6: { startTime: "12:30", endTime: "16:00" }, // 土曜
+};
 
 export type EventType = "match" | "practice" | "event";
 
@@ -32,6 +42,8 @@ const filterOptions: { value: EventType | "all"; label: string }[] = [
 
 const SchedulePage = () => {
   const { isStaff } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { isSubscribed, isLoading: pushLoading, subscribe, unsubscribe } = usePushNotification();
   const [events, setEvents] = useState<MappedEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +53,9 @@ const SchedulePage = () => {
   const [showForm, setShowForm] = useState(false);
   const [duplicateValues, setDuplicateValues] = useState<MappedEvent | null>(null);
   const [editingEvent, setEditingEvent] = useState<MappedEvent | null>(null);
+  const [notificationTemplate, setNotificationTemplate] = useState<{
+    title: string; date: string; startTime: string; endTime: string; type: "practice";
+  } | null>(null);
 
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
@@ -86,6 +101,27 @@ const SchedulePage = () => {
     fetchSchedules();
   }, [fetchSchedules]);
 
+  // 通知クリックからのディープリンク処理
+  useEffect(() => {
+    const practiceDate = searchParams.get("practiceDate");
+    if (!practiceDate) return;
+
+    const d = new Date(practiceDate + "T12:00:00");
+    const dayOfWeek = d.getDay();
+    const template = PRACTICE_TEMPLATES[dayOfWeek];
+    if (template) {
+      setNotificationTemplate({
+        title: "練習",
+        date: practiceDate,
+        startTime: template.startTime,
+        endTime: template.endTime,
+        type: "practice",
+      });
+      setShowForm(true);
+    }
+    setSearchParams({}, { replace: true });
+  }, []);
+
   const filtered = events.filter((e) => {
     if (filter !== "all" && e.type !== filter) return false;
     if (selectedDate) {
@@ -115,14 +151,33 @@ const SchedulePage = () => {
           日程
         </h1>
         {isStaff && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors flex-shrink-0"
-          >
-            <Plus size={14} />
-            <span className="hidden sm:inline">イベントを追加</span>
-            <span className="sm:hidden">追加</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={isSubscribed ? unsubscribe : subscribe}
+              disabled={pushLoading}
+              title={isSubscribed ? "練習リマインダー通知をOFF" : "練習リマインダー通知をON"}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex-shrink-0 border ${
+                isSubscribed
+                  ? "bg-green-500/10 text-green-600 border-green-500/30 hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30"
+                  : "bg-muted text-muted-foreground border-border hover:bg-secondary"
+              }`}
+            >
+              {pushLoading
+                ? <Loader2 size={14} className="animate-spin" />
+                : isSubscribed
+                  ? <Bell size={14} />
+                  : <BellOff size={14} />}
+              <span className="hidden sm:inline">{isSubscribed ? "通知ON" : "通知OFF"}</span>
+            </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors flex-shrink-0"
+            >
+              <Plus size={14} />
+              <span className="hidden sm:inline">イベントを追加</span>
+              <span className="sm:hidden">追加</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -323,11 +378,12 @@ const SchedulePage = () => {
       <AnimatePresence>
         {showForm && (
           <EventForm
-            onClose={() => { setShowForm(false); setDuplicateValues(null); setEditingEvent(null); }}
+            onClose={() => { setShowForm(false); setDuplicateValues(null); setEditingEvent(null); setNotificationTemplate(null); }}
             onSaved={() => {
               setShowForm(false);
               setDuplicateValues(null);
               setEditingEvent(null);
+              setNotificationTemplate(null);
               fetchSchedules();
             }}
             eventId={editingEvent?.id}
@@ -341,6 +397,12 @@ const SchedulePage = () => {
               type: editingEvent.type,
               detail: editingEvent.detail,
               belongings: editingEvent.belongings,
+            } : notificationTemplate ? {
+              title: notificationTemplate.title,
+              date: notificationTemplate.date,
+              startTime: notificationTemplate.startTime,
+              endTime: notificationTemplate.endTime,
+              type: notificationTemplate.type,
             } : duplicateValues ? {
               title: duplicateValues.title,
               isAllDay: duplicateValues.time === "終日",

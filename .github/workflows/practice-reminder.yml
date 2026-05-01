@@ -1,0 +1,19 @@
+name: 練習リマインダー通知
+
+on:
+  schedule:
+    # 火・木・金・土 の 20:00 JST = 11:00 UTC
+    - cron: '0 11 * * 2,4,5,6'
+  workflow_dispatch: {}
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Edge Function を呼び出す
+        run: |
+          curl -s -f -X POST \
+            "https://qtjnjlsyxujfvmajywrl.supabase.co/functions/v1/send-practice-reminder" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'

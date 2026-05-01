@@ -1,0 +1,16 @@
+{
+  "name": "筑波大附属フットサル部",
+  "short_name": "フットサル部",
+  "description": "筑波大学附属高等学校フットサル部の公式ウェブサイト",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "/og-image.jpg",
+      "sizes": "any",
+      "type": "image/jpeg"
+    }
+  ]
+}
