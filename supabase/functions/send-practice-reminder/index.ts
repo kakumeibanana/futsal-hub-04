@@ -17,14 +17,19 @@ const PRACTICE_TEMPLATES: Record<number, { startTime: string; endTime: string }>
   6: { startTime: "12:30", endTime: "16:00" }, // 土曜
 };
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
   try {
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-    // JSTで今日 + 7日後の日付を計算
-    const nowMs = Date.now() + 9 * 60 * 60 * 1000; // UTC→JST
-    const targetMs = nowMs + 7 * 24 * 60 * 60 * 1000;
-    const target = new Date(targetMs);
+    // body に practiceDate があればそれを使う、なければ今日+7日
+    const body = await req.json().catch(() => ({}));
+    let target: Date;
+    if (body.practiceDate) {
+      target = new Date(body.practiceDate + "T00:00:00Z");
+    } else {
+      const nowMs = Date.now() + 9 * 60 * 60 * 1000; // UTC→JST
+      target = new Date(nowMs + 7 * 24 * 60 * 60 * 1000);
+    }
 
     const dayOfWeek = target.getUTCDay();
     const template = PRACTICE_TEMPLATES[dayOfWeek];
