@@ -13,7 +13,7 @@ jobs:
       - name: Edge Function を呼び出す
         run: |
           curl -s -X POST \
-            "https://qtjnjlsyxujfvmajywrl.supabase.co/functions/v1/send-practice-reminder" \
+            "https://vbtzittxpdojuqjzsthv.supabase.co/functions/v1/send-practice-reminder" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{}'
