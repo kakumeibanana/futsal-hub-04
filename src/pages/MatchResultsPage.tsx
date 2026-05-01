@@ -13,7 +13,6 @@ interface MatchResult {
   match_date: string;
   score_us: number;
   score_them: number;
-  video_id: string | null;
 }
 
 interface MatchScorer {
@@ -88,6 +87,8 @@ const MatchResultsPage = () => {
   const [selectedMatch, setSelectedMatch] = useState<MatchResult | null>(null);
   const [scorers, setScorers] = useState<MatchScorer[]>([]);
   const [comments, setComments] = useState<MatchComment[]>([]);
+  const [detailVideos, setDetailVideos] = useState<VideoItem[]>([]);
+  const [activeVideoIdx, setActiveVideoIdx] = useState(0);
   const [detailLoading, setDetailLoading] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
@@ -100,7 +101,7 @@ const MatchResultsPage = () => {
   const [fDate, setFDate] = useState("");
   const [fScoreUs, setFScoreUs] = useState(0);
   const [fScoreThem, setFScoreThem] = useState(0);
-  const [fVideoId, setFVideoId] = useState<string>("");
+  const [fVideoIds, setFVideoIds] = useState<string[]>([]);
   const [fScorers, setFScorers] = useState<{ member_name: string; type: "goal" | "assist"; is_guest?: boolean }[]>([]);
   const [fScorerMember, setFScorerMember] = useState("");
   const [fScorerType, setFScorerType] = useState<"goal" | "assist">("goal");
@@ -112,7 +113,7 @@ const MatchResultsPage = () => {
     setLoading(true);
     const { data } = await supabase
       .from("match_results")
-      .select("id, title, opponent, match_date, score_us, score_them, video_id")
+      .select("id, title, opponent, match_date, score_us, score_them")
       .order("match_date", { ascending: false });
     setMatches(data ?? []);
     setLoading(false);
@@ -121,7 +122,7 @@ const MatchResultsPage = () => {
   useEffect(() => {
     fetchMatches();
     supabase.from("videos").select("id, title, type, url").order("date", { ascending: false }).then(({ data }) => {
-      setVideoList(data ?? []);
+      setVideoList((data ?? []) as VideoItem[]);
     });
   }, [fetchMatches]);
 
@@ -130,10 +131,13 @@ const MatchResultsPage = () => {
     setDetailLoading(true);
     setScorers([]);
     setComments([]);
+    setDetailVideos([]);
+    setActiveVideoIdx(0);
 
-    const [{ data: scorerData }, { data: commentData }] = await Promise.all([
+    const [{ data: scorerData }, { data: commentData }, { data: videoLinkData }] = await Promise.all([
       supabase.from("match_scorers").select("*").eq("match_id", match.id).order("display_order"),
       supabase.from("match_comments").select("*").eq("match_id", match.id).order("created_at"),
+      supabase.from("match_result_videos").select("video_id, display_order").eq("match_id", match.id).order("display_order"),
     ]);
 
     const commentIds = (commentData ?? []).map((c) => c.id);
@@ -146,6 +150,14 @@ const MatchResultsPage = () => {
       ...c,
       likes: (likeData ?? []).filter((l) => l.comment_id === c.id),
     })));
+
+    if (videoLinkData && videoLinkData.length > 0) {
+      const videoIds = videoLinkData.map((v) => v.video_id);
+      const { data: vData } = await supabase.from("videos").select("id, title, type, url").in("id", videoIds);
+      const ordered = videoIds.map((vid) => (vData ?? []).find((v) => v.id === vid)).filter(Boolean) as VideoItem[];
+      setDetailVideos(ordered);
+    }
+
     setDetailLoading(false);
   };
 
@@ -204,12 +216,15 @@ const MatchResultsPage = () => {
       setFDate(match.match_date);
       setFScoreUs(match.score_us);
       setFScoreThem(match.score_them);
-      setFVideoId(match.video_id ?? "");
-      const { data } = await supabase.from("match_scorers").select("*").eq("match_id", match.id).order("display_order");
-      setFScorers((data ?? []).map((s) => ({ member_name: s.member_name, type: s.type as "goal" | "assist" })));
+      const [{ data: scorerData }, { data: videoLinkData }] = await Promise.all([
+        supabase.from("match_scorers").select("*").eq("match_id", match.id).order("display_order"),
+        supabase.from("match_result_videos").select("video_id, display_order").eq("match_id", match.id).order("display_order"),
+      ]);
+      setFScorers((scorerData ?? []).map((s) => ({ member_name: s.member_name, type: s.type as "goal" | "assist" })));
+      setFVideoIds((videoLinkData ?? []).map((v) => v.video_id));
     } else {
       setFTitle(""); setFOpponent(""); setFDate("");
-      setFScoreUs(0); setFScoreThem(0); setFVideoId(""); setFScorers([]);
+      setFScoreUs(0); setFScoreThem(0); setFVideoIds([]); setFScorers([]);
     }
     const { data: memberData } = await supabase.from("members").select("name").order("name");
     const names = (memberData ?? []).map((m) => m.name);
@@ -230,12 +245,14 @@ const MatchResultsPage = () => {
         match_date: fDate,
         score_us: fScoreUs,
         score_them: fScoreThem,
-        video_id: fVideoId || null,
       };
       if (editingMatch) {
         await supabase.from("match_results").update(fields).eq("id", editingMatch.id);
         matchId = editingMatch.id;
-        await supabase.from("match_scorers").delete().eq("match_id", matchId);
+        await Promise.all([
+          supabase.from("match_scorers").delete().eq("match_id", matchId),
+          supabase.from("match_result_videos").delete().eq("match_id", matchId),
+        ]);
       } else {
         const { data } = await supabase.from("match_results").insert({ ...fields, created_by: memberName }).select().single();
         matchId = data!.id;
@@ -243,6 +260,11 @@ const MatchResultsPage = () => {
       if (fScorers.length > 0) {
         await supabase.from("match_scorers").insert(
           fScorers.map((s, i) => ({ match_id: matchId, member_name: s.member_name, type: s.type, display_order: i }))
+        );
+      }
+      if (fVideoIds.length > 0) {
+        await supabase.from("match_result_videos").insert(
+          fVideoIds.map((vid, i) => ({ match_id: matchId, video_id: vid, display_order: i }))
         );
       }
       setShowForm(false);
@@ -253,8 +275,6 @@ const MatchResultsPage = () => {
   };
 
   const inputClass = "w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50";
-
-  const selectedVideo = selectedMatch?.video_id ? videoList.find((v) => v.id === selectedMatch.video_id) ?? null : null;
 
   return (
     <div className="container py-10">
@@ -359,7 +379,24 @@ const MatchResultsPage = () => {
                       </div>
                     )}
 
-                    {selectedVideo && <VideoPlayer video={selectedVideo} />}
+                    {detailVideos.length > 0 && (
+                      <div className="mb-4">
+                        {detailVideos.length > 1 && (
+                          <div className="flex gap-1.5 mb-2 flex-wrap">
+                            {detailVideos.map((v, i) => (
+                              <button
+                                key={v.id}
+                                onClick={() => setActiveVideoIdx(i)}
+                                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors truncate max-w-[140px] ${activeVideoIdx === i ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                              >
+                                {v.title}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <VideoPlayer video={detailVideos[activeVideoIdx] ?? detailVideos[0]} />
+                      </div>
+                    )}
 
                     <div className="border-t border-border pt-4 mt-2">
                       <h3 className="text-sm font-semibold text-foreground mb-3">コメント</h3>
@@ -448,12 +485,33 @@ const MatchResultsPage = () => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1 block">動画</label>
-                    <select value={fVideoId} onChange={(e) => setFVideoId(e.target.value)} className={inputClass}>
-                      <option value="">動画なし</option>
-                      {videoList.map((v) => (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (id && !fVideoIds.includes(id)) setFVideoIds((prev) => [...prev, id]);
+                      }}
+                      className={inputClass}
+                    >
+                      <option value="">動画を選んで追加...</option>
+                      {videoList.filter((v) => !fVideoIds.includes(v.id)).map((v) => (
                         <option key={v.id} value={v.id}>{v.title}</option>
                       ))}
                     </select>
+                    {fVideoIds.length > 0 && (
+                      <div className="mt-2 space-y-1.5">
+                        {fVideoIds.map((id, i) => {
+                          const v = videoList.find((x) => x.id === id);
+                          if (!v) return null;
+                          return (
+                            <div key={id} className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-1.5">
+                              <span className="text-sm text-foreground truncate">{v.title}</span>
+                              <button type="button" onClick={() => setFVideoIds((prev) => prev.filter((_, idx) => idx !== i))} className="ml-2 text-muted-foreground hover:text-red-500 transition-colors shrink-0"><X size={14} /></button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium text-foreground mb-2 block">得点者・アシスト</label>
