@@ -65,7 +65,8 @@ const SchedulePage = () => {
     setLoading(true);
     setError(null);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const { data, error: fetchError } = await supabase
         .from("schedule_events")
         .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
