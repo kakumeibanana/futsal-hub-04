@@ -367,7 +367,6 @@ const MembersPage = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [gradeFilter, setGradeFilter] = useState<"all" | "2" | "1">("all");
 
   const loadMembers = async () => {
     const { data } = await supabase.from("members").select("*").eq("hidden", false);
@@ -441,27 +440,6 @@ const MembersPage = () => {
         )}
       </div>
 
-      {/* 学年フィルタータブ */}
-      <div className="flex gap-2 mb-6">
-        {([["all", "全員"], ["2", "2年生"], ["1", "1年生"]] as const).map(([val, label]) => (
-          <button
-            key={val}
-            onClick={() => setGradeFilter(val)}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${
-              gradeFilter === val
-                ? val === "2"
-                  ? "bg-purple-600 text-white border-purple-600"
-                  : val === "1"
-                  ? "bg-violet-100 text-violet-600 border-violet-400"
-                  : "bg-purple-950 text-white border-purple-950"
-                : "border-purple-200 bg-white text-purple-600 hover:bg-purple-50"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {showForm && (
         <div className="mb-6 max-w-2xl mx-auto">
           <MemberForm onSave={handleAdd} onCancel={() => setShowForm(false)} />
@@ -480,7 +458,7 @@ const MembersPage = () => {
 
       {/* 現役部員 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-        {activeMembers.filter((m) => gradeFilter === "all" || m.grade === gradeFilter).map((member) => (
+        {activeMembers.map((member) => (
           <div key={member.id} className="h-full">
             {editingMember?.id === member.id ? (
               <div className="p-1.5 rounded-2xl border-2 border-purple-300 bg-white">
@@ -500,12 +478,10 @@ const MembersPage = () => {
             )}
           </div>
         ))}
-        {activeMembers.filter((m) => gradeFilter === "all" || m.grade === gradeFilter).length === 0 && (
+        {activeMembers.length === 0 && (
           <div className="md:col-span-2 text-center bg-purple-50 rounded-3xl border-2 border-dashed border-purple-200 py-16 px-6">
-            <p className="text-purple-900 font-bold text-lg">
-              {gradeFilter === "all" ? "まだメンバーが登録されていません" : `${gradeFilter}年生のメンバーはいません`}
-            </p>
-            {isStaff && gradeFilter === "all" && <p className="text-sm text-purple-600 mt-2.5">右上の「メンバー追加」から登録を開始してください</p>}
+            <p className="text-purple-900 font-bold text-lg">まだメンバーが登録されていません</p>
+            {isStaff && <p className="text-sm text-purple-600 mt-2.5">右上の「メンバー追加」から登録を開始してください</p>}
           </div>
         )}
       </div>
