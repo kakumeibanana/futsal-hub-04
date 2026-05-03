@@ -166,23 +166,25 @@ const SchedulePage = () => {
         </h1>
         {isStaff && (
           <div className="flex items-center gap-2">
-            {role === "captain" && <button
-              onClick={isSubscribed ? unsubscribe : subscribe}
-              disabled={pushLoading}
-              title={isSubscribed ? "練習リマインダー通知をOFF" : "練習リマインダー通知をON"}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex-shrink-0 border ${
-                isSubscribed
-                  ? "bg-green-500/10 text-green-600 border-green-500/30 hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30"
-                  : "bg-muted text-muted-foreground border-border hover:bg-secondary"
-              }`}
-            >
-              {pushLoading
-                ? <Loader2 size={14} className="animate-spin" />
-                : isSubscribed
-                  ? <Bell size={14} />
-                  : <BellOff size={14} />}
-              <span className="hidden sm:inline">{isSubscribed ? "通知ON" : "通知OFF"}</span>
-            </button>
+            {role === "captain" && (
+              <button
+                onClick={isSubscribed ? unsubscribe : subscribe}
+                disabled={pushLoading}
+                title={isSubscribed ? "練習リマインダー通知をOFF" : "練習リマインダー通知をON"}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex-shrink-0 border ${
+                  isSubscribed
+                    ? "bg-green-500/10 text-green-600 border-green-500/30 hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30"
+                    : "bg-muted text-muted-foreground border-border hover:bg-secondary"
+                }`}
+              >
+                {pushLoading
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : isSubscribed
+                    ? <Bell size={14} />
+                    : <BellOff size={14} />}
+                <span className="hidden sm:inline">{isSubscribed ? "通知ON" : "通知OFF"}</span>
+              </button>
+            )}
             <button
               onClick={() => setShowForm(true)}
               className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors flex-shrink-0"
