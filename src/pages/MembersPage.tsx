@@ -27,6 +27,13 @@ const sortMembers = (list: Member[]) =>
     const bRoleIdx = DISPLAY_ROLE_ORDER.indexOf(bRole === "none" || !bRole ? "none" : bRole);
     if (aRoleIdx !== bRoleIdx) return aRoleIdx - bRoleIdx;
 
+    const gradeOrder = ["2", "1"];
+    const aGradeIdx = gradeOrder.indexOf(a.grade ?? "");
+    const bGradeIdx = gradeOrder.indexOf(b.grade ?? "");
+    const aG = aGradeIdx === -1 ? 999 : aGradeIdx;
+    const bG = bGradeIdx === -1 ? 999 : bGradeIdx;
+    if (aG !== bG) return aG - bG;
+
     const aBestPos = Math.min(...(a.positions ?? []).map((p) => {
       const i = POSITION_ORDER.indexOf(p);
       return i === -1 ? 999 : i;
@@ -52,6 +59,7 @@ interface Member {
   number: number | null;
   positions: string[] | null;
   photo_url: string | null;
+  grade: string | null;
 }
 
 // 役職タグのデザイン設定（手書きワイヤーベース）
@@ -102,11 +110,23 @@ const MemberCard = ({
 
       {/* 中央情報エリア */}
       <div className="flex-1 min-w-0 flex flex-col pt-1">
-        {/* 名前 */}
-        <span className="font-black text-2xl text-gray-900 tracking-tight truncate mb-0.5">
-          {member.name}
-        </span>
-        
+        {/* 名前 + 学年バッジ */}
+        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+          <span className="font-black text-2xl text-gray-900 tracking-tight truncate">
+            {member.name}
+          </span>
+          {member.grade === "2" && (
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-600 text-white flex-shrink-0">
+              2年
+            </span>
+          )}
+          {member.grade === "1" && (
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-violet-100 text-violet-600 border border-violet-200 flex-shrink-0">
+              1年
+            </span>
+          )}
+        </div>
+
         {/* ローマ字 */}
         {member.name_roman && (
           <div className="text-sm font-medium text-gray-500 tracking-wider mb-1">
@@ -170,6 +190,7 @@ const MemberForm = ({
   const [displayRole, setDisplayRole] = useState(initial?.display_role ?? "none");
   const [systemRole, setSystemRole] = useState(initial?.role ?? "member");
   const [photoUrl, setPhotoUrl] = useState(initial?.photo_url ?? "");
+  const [grade, setGrade] = useState(initial?.grade ?? "");
 
   const togglePosition = (p: string) => {
     setPositions((prev) =>
@@ -187,6 +208,7 @@ const MemberForm = ({
       display_role: displayRole,
       role: systemRole,
       photo_url: photoUrl.trim() || null,
+      grade: grade || null,
     });
   };
 
@@ -222,6 +244,30 @@ const MemberForm = ({
               }`}
             >
               {p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-bold text-purple-900 mb-1.5 block">学年</label>
+        <div className="flex gap-2">
+          {[{ value: "", label: "未設定" }, { value: "2", label: "2年生" }, { value: "1", label: "1年生" }].map((g) => (
+            <button
+              key={g.value}
+              type="button"
+              onClick={() => setGrade(g.value)}
+              className={`px-4 py-1.5 rounded-md text-xs font-bold border-2 transition-all ${
+                grade === g.value
+                  ? g.value === "2"
+                    ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                    : g.value === "1"
+                    ? "bg-violet-100 text-violet-600 border-violet-400"
+                    : "bg-gray-200 text-gray-600 border-gray-300"
+                  : "border-purple-200 bg-white text-purple-600 hover:bg-purple-50"
+              }`}
+            >
+              {g.label}
             </button>
           ))}
         </div>
@@ -279,6 +325,7 @@ const MembersPage = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [gradeFilter, setGradeFilter] = useState<"all" | "2" | "1">("all");
 
   const loadMembers = async () => {
     const { data } = await supabase.from("members").select("*").eq("hidden", false);
@@ -350,6 +397,27 @@ const MembersPage = () => {
         )}
       </div>
 
+      {/* 学年フィルタータブ */}
+      <div className="flex gap-2 mb-6">
+        {([["all", "全員"], ["2", "2年生"], ["1", "1年生"]] as const).map(([val, label]) => (
+          <button
+            key={val}
+            onClick={() => setGradeFilter(val)}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${
+              gradeFilter === val
+                ? val === "2"
+                  ? "bg-purple-600 text-white border-purple-600"
+                  : val === "1"
+                  ? "bg-violet-100 text-violet-600 border-violet-400"
+                  : "bg-purple-950 text-white border-purple-950"
+                : "border-purple-200 bg-white text-purple-600 hover:bg-purple-50"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {showForm && (
         <div className="mb-6 max-w-2xl mx-auto">
           <MemberForm onSave={handleAdd} onCancel={() => setShowForm(false)} />
@@ -368,7 +436,7 @@ const MembersPage = () => {
 
       {/* 2列レイアウトに変更 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-        {members.map((member) => (
+        {members.filter((m) => gradeFilter === "all" || m.grade === gradeFilter).map((member) => (
           <div key={member.id} className="h-full">
             {editingMember?.id === member.id ? (
               <div className="p-1.5 rounded-2xl border-2 border-purple-300 bg-white">
@@ -391,10 +459,12 @@ const MembersPage = () => {
             )}
           </div>
         ))}
-        {members.length === 0 && (
+        {members.filter((m) => gradeFilter === "all" || m.grade === gradeFilter).length === 0 && (
           <div className="md:col-span-2 text-center bg-purple-50 rounded-3xl border-2 border-dashed border-purple-200 py-16 px-6">
-            <p className="text-purple-900 font-bold text-lg">まだメンバーが登録されていません</p>
-            {isStaff && <p className="text-sm text-purple-600 mt-2.5">右上の「メンバー追加」から登録を開始してください</p>}
+            <p className="text-purple-900 font-bold text-lg">
+              {gradeFilter === "all" ? "まだメンバーが登録されていません" : `${gradeFilter}年生のメンバーはいません`}
+            </p>
+            {isStaff && gradeFilter === "all" && <p className="text-sm text-purple-600 mt-2.5">右上の「メンバー追加」から登録を開始してください</p>}
           </div>
         )}
       </div>
