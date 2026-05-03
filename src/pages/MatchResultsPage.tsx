@@ -336,7 +336,7 @@ const MatchResultsPage = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto max-h-[90vh]"
+              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto overflow-x-hidden max-h-[90vh]"
             >
               <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
                 {isStaff && (
@@ -362,10 +362,10 @@ const MatchResultsPage = () => {
                       <p className="text-xl font-bold text-foreground">vs {selectedMatch.opponent}</p>
                     </div>
 
-                    <div className="flex items-baseline gap-4 mb-4">
-                      <span className="text-7xl font-black text-foreground">{selectedMatch.score_us}</span>
-                      <span className="text-3xl text-muted-foreground font-light">-</span>
-                      <span className="text-7xl font-black text-foreground">{selectedMatch.score_them}</span>
+                    <div className="flex items-baseline gap-3 mb-4">
+                      <span className="text-5xl sm:text-7xl font-black text-foreground">{selectedMatch.score_us}</span>
+                      <span className="text-2xl sm:text-3xl text-muted-foreground font-light">-</span>
+                      <span className="text-5xl sm:text-7xl font-black text-foreground">{selectedMatch.score_them}</span>
                     </div>
 
                     {scorers.length > 0 && (
@@ -455,7 +455,7 @@ const MatchResultsPage = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto max-h-[90vh]"
+              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto overflow-x-hidden max-h-[90vh]"
             >
               <button onClick={() => setShowForm(false)} className="absolute top-4 right-4 p-2 bg-muted/50 hover:bg-muted rounded-full text-muted-foreground z-10"><X size={20} /></button>
               <div className="p-6 sm:p-8">
