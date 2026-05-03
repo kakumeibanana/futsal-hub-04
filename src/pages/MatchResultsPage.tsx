@@ -424,14 +424,14 @@ const MatchResultsPage = () => {
                           );
                         })}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 overflow-hidden">
                         <input
                           type="text"
                           value={newComment}
                           onChange={(e) => setNewComment(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleComment(); } }}
                           placeholder="コメントを入力..."
-                          className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                         />
                         <button onClick={handleComment} disabled={!newComment.trim() || commentLoading} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
                           {commentLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

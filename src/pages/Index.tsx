@@ -96,7 +96,8 @@ const Index = () => {
         supabase
           .from("members")
           .select("*", { count: "exact", head: true })
-          .eq("hidden", false),
+          .eq("hidden", false)
+          .in("grade", ["1", "2"]),
         supabase
           .from("match_results")
           .select("id, title, opponent, match_date, score_us, score_them")

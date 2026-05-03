@@ -43,7 +43,7 @@ const filterOptions: { value: EventType | "all"; label: string }[] = [
 ];
 
 const SchedulePage = () => {
-  const { isStaff } = useAuth();
+  const { isStaff, role } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isSubscribed, isLoading: pushLoading, subscribe, unsubscribe } = usePushNotification();
   const [events, setEvents] = useState<MappedEvent[]>([]);
@@ -166,7 +166,7 @@ const SchedulePage = () => {
         </h1>
         {isStaff && (
           <div className="flex items-center gap-2">
-            <button
+            {role === "captain" && <button
               onClick={isSubscribed ? unsubscribe : subscribe}
               disabled={pushLoading}
               title={isSubscribed ? "練習リマインダー通知をOFF" : "練習リマインダー通知をON"}
