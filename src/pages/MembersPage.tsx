@@ -9,23 +9,28 @@ import { supabase } from "@/integrations/supabase/client";
 
 const POSITIONS = ["ゴレイロ", "フィクソ", "右アラ", "左アラ", "ピヴォ"];
 const DISPLAY_ROLES = [
-  { value: "none", label: "なし" },
   { value: "captain", label: "主将" },
   { value: "vice_captain", label: "副主将" },
   { value: "club_leader", label: "クラブ長" },
   { value: "treasurer", label: "会計" },
+  { value: "ex_captain", label: "元主将" },
+  { value: "ex_vice_captain", label: "元副主将" },
+  { value: "ex_club_leader", label: "元クラブ長" },
+  { value: "ex_treasurer", label: "元会計" },
 ];
 
-const DISPLAY_ROLE_ORDER = ["captain", "vice_captain", "club_leader", "treasurer", "none"];
+const DISPLAY_ROLE_ORDER = ["captain", "vice_captain", "club_leader", "treasurer", "ex_captain", "ex_vice_captain", "ex_club_leader", "ex_treasurer", "none"];
 const POSITION_ORDER = ["ピヴォ", "右アラ", "左アラ", "フィクソ", "ゴレイロ"];
 
 const sortMembers = (list: Member[]) =>
   [...list].sort((a, b) => {
-    const aRole = a.display_role ?? "none";
-    const bRole = b.display_role ?? "none";
-    const aRoleIdx = DISPLAY_ROLE_ORDER.indexOf(aRole === "none" || !aRole ? "none" : aRole);
-    const bRoleIdx = DISPLAY_ROLE_ORDER.indexOf(bRole === "none" || !bRole ? "none" : bRole);
-    if (aRoleIdx !== bRoleIdx) return aRoleIdx - bRoleIdx;
+    const aRole = a.display_roles?.[0] ?? "none";
+    const bRole = b.display_roles?.[0] ?? "none";
+    const aRoleIdx = DISPLAY_ROLE_ORDER.indexOf(aRole);
+    const bRoleIdx = DISPLAY_ROLE_ORDER.indexOf(bRole);
+    const aIdx = aRoleIdx === -1 ? 999 : aRoleIdx;
+    const bIdx = bRoleIdx === -1 ? 999 : bRoleIdx;
+    if (aIdx !== bIdx) return aIdx - bIdx;
 
     const gradeOrder = ["2", "1"];
     const aGradeIdx = gradeOrder.indexOf(a.grade ?? "");
@@ -55,19 +60,22 @@ interface Member {
   name: string;
   name_roman: string | null;
   role: string;
-  display_role: string | null;
+  display_roles: string[];
   number: number | null;
   positions: string[] | null;
   photo_url: string | null;
   grade: string | null;
 }
 
-// 役職タグのデザイン設定（手書きワイヤーベース）
-const displayRoleConfig = {
-  captain:      { label: "C",  bg: "bg-amber-400",  text: "text-black" },
-  vice_captain: { label: "VC", bg: "bg-blue-600",   text: "text-white" },
-  club_leader:  { label: "CL", bg: "bg-purple-700", text: "text-white" },
-  treasurer:    { label: "AC", bg: "bg-green-600", text: "text-white" },
+const displayRoleConfig: Record<string, { label: string; bg: string; text: string }> = {
+  captain:         { label: "C",    bg: "bg-amber-400",   text: "text-black" },
+  vice_captain:    { label: "VC",   bg: "bg-blue-600",    text: "text-white" },
+  club_leader:     { label: "CL",   bg: "bg-purple-700",  text: "text-white" },
+  treasurer:       { label: "AC",   bg: "bg-green-600",   text: "text-white" },
+  ex_captain:      { label: "元C",  bg: "bg-amber-100",   text: "text-amber-700" },
+  ex_vice_captain: { label: "元VC", bg: "bg-blue-100",    text: "text-blue-700" },
+  ex_club_leader:  { label: "元CL", bg: "bg-purple-200",  text: "text-purple-800" },
+  ex_treasurer:    { label: "元AC", bg: "bg-green-100",   text: "text-green-700" },
 };
 
 // ── メンバーカード（新・2列＆背番号フォントデザイン）──────────────────
@@ -79,9 +87,7 @@ const MemberCard = ({
   onEdit: (m: Member) => void;
   onDelete: (m: Member) => void;
 }) => {
-  const drConfig = member.display_role && member.display_role !== "none"
-    ? displayRoleConfig[member.display_role as keyof typeof displayRoleConfig]
-    : null;
+  const roleConfigs = (member.display_roles ?? []).map((r) => displayRoleConfig[r]).filter(Boolean);
 
   return (
     <motion.div
@@ -89,7 +95,7 @@ const MemberCard = ({
       animate={{ opacity: 1, y: 0 }}
       className="relative flex items-center gap-4 p-5 rounded-2xl border-2 border-purple-100 bg-white shadow-sm hover:shadow-md transition-all group overflow-hidden h-full"
     >
-      {/* 写真 or アバター（左側、役職タグ付き） */}
+      {/* 写真 or アバター */}
       <div className="relative flex-shrink-0">
         <div className="relative w-16 h-16 rounded-full bg-purple-50 flex items-center justify-center overflow-hidden border-2 border-purple-200">
           {member.photo_url ? (
@@ -100,12 +106,6 @@ const MemberCard = ({
             </span>
           )}
         </div>
-        {/* 役職バッジ（アバターの左上・手書き風） */}
-        {drConfig && (
-          <span className={`absolute -top-1.5 -left-1.5 text-[10px] font-black px-1.5 py-0.5 shadow-sm rounded-sm ${drConfig.bg} ${drConfig.text}`}>
-            {drConfig.label}
-          </span>
-        )}
       </div>
 
       {/* 中央情報エリア */}
@@ -126,6 +126,16 @@ const MemberCard = ({
             </span>
           )}
         </div>
+        {/* 役職バッジ（複数） */}
+        {roleConfigs.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1">
+            {roleConfigs.map((cfg, i) => (
+              <span key={i} className={`text-[10px] font-black px-1.5 py-0.5 shadow-sm rounded-sm ${cfg.bg} ${cfg.text}`}>
+                {cfg.label}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* ローマ字 */}
         {member.name_roman && (
@@ -187,7 +197,7 @@ const MemberForm = ({
   const [nameRoman, setNameRoman] = useState(initial?.name_roman ?? "");
   const [number, setNumber] = useState(initial?.number?.toString() ?? "");
   const [positions, setPositions] = useState<string[]>(initial?.positions ?? []);
-  const [displayRole, setDisplayRole] = useState(initial?.display_role ?? "none");
+  const [displayRoles, setDisplayRoles] = useState<string[]>(initial?.display_roles ?? []);
   const [systemRole, setSystemRole] = useState(initial?.role ?? "member");
   const [photoUrl, setPhotoUrl] = useState(initial?.photo_url ?? "");
   const [grade, setGrade] = useState(initial?.grade ?? "");
@@ -198,6 +208,12 @@ const MemberForm = ({
     );
   };
 
+  const toggleDisplayRole = (r: string) => {
+    setDisplayRoles((prev) =>
+      prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]
+    );
+  };
+
   const handleSave = () => {
     if (!name.trim()) return;
     onSave({
@@ -205,7 +221,7 @@ const MemberForm = ({
       name_roman: nameRoman.trim() || null,
       number: number ? parseInt(number) : null,
       positions,
-      display_role: displayRole,
+      display_roles: displayRoles,
       role: systemRole,
       photo_url: photoUrl.trim() || null,
       grade: grade || null,
@@ -275,31 +291,37 @@ const MemberForm = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs font-bold text-purple-900 mb-1 block">表示役割</label>
-          <select
-            value={displayRole}
-            onChange={(e) => setDisplayRole(e.target.value)}
-            className="w-full h-10 rounded-lg border-2 border-purple-200 bg-white px-3 text-sm font-medium focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-          >
-            {DISPLAY_ROLES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
+      <div>
+        <label className="text-xs font-bold text-purple-900 mb-1.5 block">表示役割 <span className="font-normal text-purple-400">（複数選択可）</span></label>
+        <div className="flex flex-wrap gap-1.5">
+          {DISPLAY_ROLES.map((r) => (
+            <button
+              key={r.value}
+              type="button"
+              onClick={() => toggleDisplayRole(r.value)}
+              className={`px-3 py-1 rounded-md text-xs font-bold border-2 transition-all ${
+                displayRoles.includes(r.value)
+                  ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                  : "border-purple-200 bg-white text-purple-600 hover:bg-purple-100"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
         </div>
-        <div>
-          <label className="text-xs font-bold text-purple-900 mb-1 block">システム権限</label>
-          <select
-            value={systemRole}
-            onChange={(e) => setSystemRole(e.target.value)}
-            className="w-full h-10 rounded-lg border-2 border-purple-200 bg-white px-3 text-sm font-medium focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-          >
-            {SYSTEM_ROLES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
-        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-bold text-purple-900 mb-1 block">システム権限</label>
+        <select
+          value={systemRole}
+          onChange={(e) => setSystemRole(e.target.value)}
+          className="w-full h-10 rounded-lg border-2 border-purple-200 bg-white px-3 text-sm font-medium focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+        >
+          {SYSTEM_ROLES.map((r) => (
+            <option key={r.value} value={r.value}>{r.label}</option>
+          ))}
+        </select>
       </div>
 
       <div>
