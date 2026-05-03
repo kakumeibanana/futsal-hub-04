@@ -61,7 +61,7 @@ const LoginPage = () => {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-primary text-primary-foreground text-xl font-black mb-4">
             F
           </div>
-          <h1 className="font-display font-bold text-2xl text-foreground">部員ログイン</h1>
+          <h1 className="font-display font-bold text-2xl text-foreground">関係者ログイン</h1>
           <p className="text-sm text-muted-foreground mt-1">
             チームパスワードを入力してログイン
           </p>

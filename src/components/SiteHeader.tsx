@@ -69,7 +69,7 @@ const SiteHeader = () => {
             <Link to="/login">
               <Button variant="default" size="sm" className="gap-1.5">
                 <LogIn size={14} />
-                部員ログイン
+                関係者ログイン
               </Button>
             </Link>
           )}
@@ -134,7 +134,7 @@ const SiteHeader = () => {
                     className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground"
                   >
                     <LogIn size={14} />
-                    部員ログイン
+                    関係者ログイン
                   </Link>
                 )}
               </div>
