@@ -17,9 +17,13 @@ const DISPLAY_ROLES = [
   { value: "ex_vice_captain", label: "元副主将" },
   { value: "ex_club_leader", label: "元クラブ長" },
   { value: "ex_treasurer", label: "元会計" },
+  { value: "advisor", label: "顧問" },
+  { value: "manager", label: "監督" },
+  { value: "coach", label: "コーチ" },
+  { value: "gk_coach", label: "ゴレイロコーチ" },
 ];
 
-const DISPLAY_ROLE_ORDER = ["captain", "vice_captain", "club_leader", "treasurer", "ex_captain", "ex_vice_captain", "ex_club_leader", "ex_treasurer", "none"];
+const DISPLAY_ROLE_ORDER = ["advisor", "manager", "coach", "gk_coach", "captain", "vice_captain", "club_leader", "treasurer", "ex_captain", "ex_vice_captain", "ex_club_leader", "ex_treasurer", "none"];
 const POSITION_ORDER = ["ピヴォ", "右アラ", "左アラ", "フィクソ", "ゴレイロ"];
 
 const sortMembers = (list: Member[]) =>
@@ -72,10 +76,14 @@ const displayRoleConfig: Record<string, { label: string; bg: string; text: strin
   vice_captain:    { label: "VC",   bg: "bg-blue-600",    text: "text-white" },
   club_leader:     { label: "CL",   bg: "bg-purple-700",  text: "text-white" },
   treasurer:       { label: "AC",   bg: "bg-green-600",   text: "text-white" },
-  ex_captain:      { label: "元C",  bg: "bg-amber-100",   text: "text-amber-700" },
-  ex_vice_captain: { label: "元VC", bg: "bg-blue-100",    text: "text-blue-700" },
-  ex_club_leader:  { label: "元CL", bg: "bg-purple-200",  text: "text-purple-800" },
-  ex_treasurer:    { label: "元AC", bg: "bg-green-100",   text: "text-green-700" },
+  ex_captain:      { label: "元C",    bg: "bg-amber-100",   text: "text-amber-700" },
+  ex_vice_captain: { label: "元VC",   bg: "bg-blue-100",    text: "text-blue-700" },
+  ex_club_leader:  { label: "元CL",   bg: "bg-purple-200",  text: "text-purple-800" },
+  ex_treasurer:    { label: "元AC",   bg: "bg-green-100",   text: "text-green-700" },
+  advisor:         { label: "顧問",   bg: "bg-slate-700",   text: "text-white" },
+  manager:         { label: "監督",   bg: "bg-slate-600",   text: "text-white" },
+  coach:           { label: "コーチ", bg: "bg-slate-500",   text: "text-white" },
+  gk_coach:        { label: "GKコーチ", bg: "bg-slate-400", text: "text-white" },
 };
 
 // ── メンバーカード（新・2列＆背番号フォントデザイン）──────────────────
@@ -268,7 +276,13 @@ const MemberForm = ({
       <div>
         <label className="text-xs font-bold text-purple-900 mb-1.5 block">学年</label>
         <div className="flex gap-2">
-          {[{ value: "", label: "未設定" }, { value: "2", label: "2年生" }, { value: "1", label: "1年生" }, { value: "3", label: "3年（引退）" }].map((g) => (
+          {[
+            { value: "", label: "未設定" },
+            { value: "2", label: "2年生" },
+            { value: "1", label: "1年生" },
+            { value: "3", label: "3年（引退）" },
+            { value: "staff", label: "スタッフ" },
+          ].map((g) => (
             <button
               key={g.value}
               type="button"
@@ -281,6 +295,8 @@ const MemberForm = ({
                     ? "bg-violet-100 text-violet-600 border-violet-400"
                     : g.value === "3"
                     ? "bg-gray-400 text-white border-gray-400"
+                    : g.value === "staff"
+                    ? "bg-slate-700 text-white border-slate-700 shadow-sm"
                     : "bg-gray-200 text-gray-600 border-gray-300"
                   : "border-purple-200 bg-white text-purple-600 hover:bg-purple-50"
               }`}
@@ -347,6 +363,7 @@ const MembersPage = () => {
   const { toast } = useToast();
   const [activeMembers, setActiveMembers] = useState<Member[]>([]);
   const [retiredMembers, setRetiredMembers] = useState<Member[]>([]);
+  const [staffMembers, setStaffMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -355,8 +372,9 @@ const MembersPage = () => {
   const loadMembers = async () => {
     const { data } = await supabase.from("members").select("*").eq("hidden", false);
     const visible = (data ?? []).filter((m: any) => !m.hidden) as Member[];
-    setActiveMembers(sortMembers(visible.filter((m) => m.grade !== "3")));
+    setActiveMembers(sortMembers(visible.filter((m) => m.grade !== "3" && m.grade !== "staff")));
     setRetiredMembers(sortMembers(visible.filter((m) => m.grade === "3")));
+    setStaffMembers(sortMembers(visible.filter((m) => m.grade === "staff")));
     setLoading(false);
   };
 
@@ -491,6 +509,40 @@ const MembersPage = () => {
           </div>
         )}
       </div>
+
+      {/* スタッフセクション */}
+      {staffMembers.length > 0 && (
+        <div className="mt-10">
+          <div className="flex items-center gap-3 mb-5 pb-2 border-b-2 border-slate-200">
+            <h2 className="font-black text-lg text-slate-600 tracking-tight">スタッフ</h2>
+            <span className="text-sm font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+              {staffMembers.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+            {staffMembers.map((member) => (
+              <div key={member.id} className="h-full">
+                {editingMember?.id === member.id ? (
+                  <div className="p-1.5 rounded-2xl border-2 border-purple-300 bg-white">
+                    <MemberForm
+                      initial={member}
+                      onSave={handleUpdate}
+                      onCancel={() => setEditingMember(null)}
+                    />
+                  </div>
+                ) : (
+                  <MemberCard
+                    member={member}
+                    isStaff={isStaff}
+                    onEdit={(m) => { setShowForm(false); setEditingMember(m); }}
+                    onDelete={handleDelete}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 引退部員セクション */}
       {retiredMembers.length > 0 && (
