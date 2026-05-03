@@ -252,7 +252,7 @@ const MemberForm = ({
       <div>
         <label className="text-xs font-bold text-purple-900 mb-1.5 block">学年</label>
         <div className="flex gap-2">
-          {[{ value: "", label: "未設定" }, { value: "2", label: "2年生" }, { value: "1", label: "1年生" }].map((g) => (
+          {[{ value: "", label: "未設定" }, { value: "2", label: "2年生" }, { value: "1", label: "1年生" }, { value: "3", label: "3年（引退）" }].map((g) => (
             <button
               key={g.value}
               type="button"
@@ -263,6 +263,8 @@ const MemberForm = ({
                     ? "bg-purple-600 text-white border-purple-600 shadow-sm"
                     : g.value === "1"
                     ? "bg-violet-100 text-violet-600 border-violet-400"
+                    : g.value === "3"
+                    ? "bg-gray-400 text-white border-gray-400"
                     : "bg-gray-200 text-gray-600 border-gray-300"
                   : "border-purple-200 bg-white text-purple-600 hover:bg-purple-50"
               }`}
@@ -321,7 +323,8 @@ const MemberForm = ({
 const MembersPage = () => {
   const { isStaff } = useAuth();
   const { toast } = useToast();
-  const [members, setMembers] = useState<Member[]>([]);
+  const [activeMembers, setActiveMembers] = useState<Member[]>([]);
+  const [retiredMembers, setRetiredMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -330,7 +333,8 @@ const MembersPage = () => {
   const loadMembers = async () => {
     const { data } = await supabase.from("members").select("*").eq("hidden", false);
     const visible = (data ?? []).filter((m: any) => !m.hidden) as Member[];
-    setMembers(sortMembers(visible));
+    setActiveMembers(sortMembers(visible.filter((m) => m.grade !== "3")));
+    setRetiredMembers(sortMembers(visible.filter((m) => m.grade === "3")));
     setLoading(false);
   };
 
@@ -387,7 +391,7 @@ const MembersPage = () => {
           <Users size={34} className="text-purple-600 flex-shrink-0 hidden sm:block" />
           MEMBER
           <span className="text-base sm:text-lg font-bold text-purple-400 ml-1 sm:ml-1.5 bg-purple-50 px-2 sm:px-3 py-0.5 rounded-full border border-purple-100 flex-shrink-0">
-            {members.length}
+            {activeMembers.length}
           </span>
         </h1>
         {isStaff && !showForm && !editingMember && (
@@ -434,9 +438,9 @@ const MembersPage = () => {
         </button>
       )}
 
-      {/* 2列レイアウトに変更 */}
+      {/* 現役部員 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-        {members.filter((m) => gradeFilter === "all" || m.grade === gradeFilter).map((member) => (
+        {activeMembers.filter((m) => gradeFilter === "all" || m.grade === gradeFilter).map((member) => (
           <div key={member.id} className="h-full">
             {editingMember?.id === member.id ? (
               <div className="p-1.5 rounded-2xl border-2 border-purple-300 bg-white">
@@ -450,16 +454,13 @@ const MembersPage = () => {
               <MemberCard
                 member={member}
                 isStaff={isStaff}
-                onEdit={(m) => {
-                  setShowForm(false);
-                  setEditingMember(m);
-                }}
+                onEdit={(m) => { setShowForm(false); setEditingMember(m); }}
                 onDelete={handleDelete}
               />
             )}
           </div>
         ))}
-        {members.filter((m) => gradeFilter === "all" || m.grade === gradeFilter).length === 0 && (
+        {activeMembers.filter((m) => gradeFilter === "all" || m.grade === gradeFilter).length === 0 && (
           <div className="md:col-span-2 text-center bg-purple-50 rounded-3xl border-2 border-dashed border-purple-200 py-16 px-6">
             <p className="text-purple-900 font-bold text-lg">
               {gradeFilter === "all" ? "まだメンバーが登録されていません" : `${gradeFilter}年生のメンバーはいません`}
@@ -468,6 +469,40 @@ const MembersPage = () => {
           </div>
         )}
       </div>
+
+      {/* 引退部員セクション */}
+      {retiredMembers.length > 0 && (
+        <div className="mt-10">
+          <div className="flex items-center gap-3 mb-5 pb-2 border-b-2 border-gray-100">
+            <h2 className="font-black text-lg text-gray-500 tracking-tight">引退部員</h2>
+            <span className="text-sm font-bold text-gray-400 bg-gray-100 px-2.5 py-0.5 rounded-full border border-gray-200">
+              {retiredMembers.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 opacity-70">
+            {retiredMembers.map((member) => (
+              <div key={member.id} className="h-full">
+                {editingMember?.id === member.id ? (
+                  <div className="p-1.5 rounded-2xl border-2 border-purple-300 bg-white">
+                    <MemberForm
+                      initial={member}
+                      onSave={handleUpdate}
+                      onCancel={() => setEditingMember(null)}
+                    />
+                  </div>
+                ) : (
+                  <MemberCard
+                    member={member}
+                    isStaff={isStaff}
+                    onEdit={(m) => { setShowForm(false); setEditingMember(m); }}
+                    onDelete={handleDelete}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
