@@ -48,8 +48,8 @@ Deno.serve(async (req) => {
     const dayName = DAY_NAMES[dayOfWeek];
 
     const payload = JSON.stringify({
-      title: `${month}/${day}(${dayName}) の練習`,
-      body: `${template.startTime}〜${template.endTime} の練習を登録しますか？`,
+      title: "来週の日程を登録しよう",
+      body: `${month}/${day}(${dayName}) 練習 ${template.startTime}〜${template.endTime}`,
       url: `${APP_URL}/schedule?practiceDate=${dateStr}`,
     });
 
@@ -60,7 +60,8 @@ Deno.serve(async (req) => {
 
     const { data: subs, error } = await supabase
       .from("push_subscriptions")
-      .select("endpoint, p256dh, auth");
+      .select("endpoint, p256dh, auth")
+      .eq("member_role", "captain");
 
     if (error) throw error;
 

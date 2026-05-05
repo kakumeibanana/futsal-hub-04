@@ -56,6 +56,7 @@ export function usePushNotification() {
           endpoint: json.endpoint,
           p256dh: (json.keys as Record<string, string>).p256dh,
           auth: (json.keys as Record<string, string>).auth,
+          member_role: localStorage.getItem('futsal_member_role') ?? 'member',
         },
         { onConflict: 'endpoint' }
       );
