@@ -9,6 +9,7 @@ const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
 interface MatchResult {
   id: string;
   title: string | null;
+  match_type: "official" | "practice" | "friendly";
   opponent: string;
   match_date: string;
   score_us: number;
@@ -97,6 +98,7 @@ const MatchResultsPage = () => {
   const [editingMatch, setEditingMatch] = useState<MatchResult | null>(null);
   const [members, setMembers] = useState<string[]>([]);
   const [fTitle, setFTitle] = useState("");
+  const [fMatchType, setFMatchType] = useState<"official" | "practice" | "friendly">("official");
   const [fOpponent, setFOpponent] = useState("");
   const [fDate, setFDate] = useState("");
   const [fScoreUs, setFScoreUs] = useState(0);
@@ -113,7 +115,7 @@ const MatchResultsPage = () => {
     setLoading(true);
     const { data } = await supabase
       .from("match_results")
-      .select("id, title, opponent, match_date, score_us, score_them")
+      .select("id, title, match_type, opponent, match_date, score_us, score_them")
       .order("match_date", { ascending: false });
     setMatches(data ?? []);
     setLoading(false);
@@ -212,6 +214,7 @@ const MatchResultsPage = () => {
     setEditingMatch(match);
     if (match) {
       setFTitle(match.title ?? "");
+      setFMatchType(match.match_type ?? "official");
       setFOpponent(match.opponent);
       setFDate(match.match_date);
       setFScoreUs(match.score_us);
@@ -223,7 +226,7 @@ const MatchResultsPage = () => {
       setFScorers((scorerData ?? []).map((s) => ({ member_name: s.member_name, type: s.type as "goal" | "assist" })));
       setFVideoIds((videoLinkData ?? []).map((v) => v.video_id));
     } else {
-      setFTitle(""); setFOpponent(""); setFDate("");
+      setFTitle(""); setFMatchType("official"); setFOpponent(""); setFDate("");
       setFScoreUs(0); setFScoreThem(0); setFVideoIds([]); setFScorers([]);
     }
     const { data: memberData } = await supabase.from("members").select("name").order("name");
@@ -241,6 +244,7 @@ const MatchResultsPage = () => {
       let matchId: string;
       const fields = {
         title: fTitle || null,
+        match_type: fMatchType,
         opponent: fOpponent,
         match_date: fDate,
         score_us: fScoreUs,
@@ -312,7 +316,17 @@ const MatchResultsPage = () => {
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-muted-foreground">{formatDate(match.match_date)}</span>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${result.bg} ${result.text} ${result.border}`}>{result.label}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                      match.match_type === "official" ? "bg-blue-500/10 text-blue-600 border-blue-500/30" :
+                      match.match_type === "practice" ? "bg-gray-500/10 text-gray-500 border-gray-400/30" :
+                      "bg-orange-500/10 text-orange-500 border-orange-500/30"
+                    }`}>{
+                      match.match_type === "official" ? "公式戦" :
+                      match.match_type === "practice" ? "練習試合" : "フレンドリー"
+                    }</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${result.bg} ${result.text} ${result.border}`}>{result.label}</span>
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">vs {match.opponent}</p>
                 <div className="flex items-baseline gap-2">
@@ -354,7 +368,17 @@ const MatchResultsPage = () => {
                 ) : (
                   <>
                     <div className="mb-4">
-                      {selectedMatch.title && <p className="text-xs text-muted-foreground mb-1">{selectedMatch.title}</p>}
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                          selectedMatch.match_type === "official" ? "bg-blue-500/10 text-blue-600 border-blue-500/30" :
+                          selectedMatch.match_type === "practice" ? "bg-gray-500/10 text-gray-500 border-gray-400/30" :
+                          "bg-orange-500/10 text-orange-500 border-orange-500/30"
+                        }`}>{
+                          selectedMatch.match_type === "official" ? "公式戦" :
+                          selectedMatch.match_type === "practice" ? "練習試合" : "フレンドリー"
+                        }</span>
+                        {selectedMatch.title && <span className="text-xs text-muted-foreground">{selectedMatch.title}</span>}
+                      </div>
                       <div className="flex items-center gap-3 mb-1">
                         <span className="text-sm text-muted-foreground">{formatDate(selectedMatch.match_date)}</span>
                         {(() => { const r = getResult(selectedMatch.score_us, selectedMatch.score_them); return <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${r.bg} ${r.text} ${r.border}`}>{r.label}</span>; })()}
@@ -462,7 +486,26 @@ const MatchResultsPage = () => {
                 <h2 className="text-xl font-bold text-foreground mb-6">{editingMatch ? "試合結果を編集" : "試合結果を追加"}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-foreground mb-1 block">試合名（任意）</label>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">試合種別 *</label>
+                    <div className="flex rounded-lg border border-border overflow-hidden w-fit">
+                      {([
+                        { value: "official", label: "公式戦" },
+                        { value: "practice", label: "練習試合" },
+                        { value: "friendly", label: "フレンドリー" },
+                      ] as const).map((t) => (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => setFMatchType(t.value)}
+                          className={`px-3 py-2 text-xs font-semibold transition-colors ${fMatchType === t.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1 block">大会名・試合名（任意）</label>
                     <input type="text" value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="例: 春季大会 1回戦" className={inputClass} />
                   </div>
                   <div>
