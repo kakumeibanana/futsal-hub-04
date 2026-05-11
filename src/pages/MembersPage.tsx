@@ -427,17 +427,42 @@ const MembersPage = () => {
     </div>
   );
 
+  const year2Count = activeMembers.filter((m) => m.grade === "2").length;
+  const year1Count = activeMembers.filter((m) => m.grade === "1").length;
+
+  const allPlayers = [...activeMembers, ...thirdYearMembers];
+  const leaderRoles = [
+    { key: "captain", label: "主将" },
+    { key: "vice_captain", label: "副主将" },
+    { key: "club_leader", label: "クラブ長" },
+    { key: "treasurer", label: "会計" },
+  ] as const;
+  const leaders = leaderRoles
+    .map((r) => ({ ...r, member: allPlayers.find((m) => m.display_roles?.includes(r.key)) }))
+    .filter((r) => r.member);
+
   return (
     <div className="container py-8 sm:py-12 max-w-5xl">
       <div className="flex items-center justify-between mb-8 pb-3 border-b-2 border-purple-100">
-        <h1 className="font-display font-black text-2xl sm:text-4xl text-purple-950 flex items-center gap-2 sm:gap-3.5 tracking-tight drop-shadow-sm min-w-0">
-          <Users size={26} className="text-purple-600 flex-shrink-0 sm:hidden" />
-          <Users size={34} className="text-purple-600 flex-shrink-0 hidden sm:block" />
-          MEMBER
-          <span className="text-base sm:text-lg font-bold text-purple-400 ml-1 sm:ml-1.5 bg-purple-50 px-2 sm:px-3 py-0.5 rounded-full border border-purple-100 flex-shrink-0">
-            {activeMembers.length}
-          </span>
-        </h1>
+        <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-wrap">
+          <h1 className="font-display font-black text-2xl sm:text-4xl text-purple-950 flex items-center gap-2 sm:gap-3 tracking-tight drop-shadow-sm">
+            <Users size={26} className="text-purple-600 flex-shrink-0 sm:hidden" />
+            <Users size={34} className="text-purple-600 flex-shrink-0 hidden sm:block" />
+            MEMBER
+          </h1>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {year2Count > 0 && (
+              <span className="text-xs font-black px-2.5 py-1 rounded-full bg-purple-600 text-white">
+                2年 {year2Count}名
+              </span>
+            )}
+            {year1Count > 0 && (
+              <span className="text-xs font-black px-2.5 py-1 rounded-full bg-violet-100 text-violet-600 border border-violet-200">
+                1年 {year1Count}名
+              </span>
+            )}
+          </div>
+        </div>
         {isStaff && !showForm && !editingMember && (
           <Button onClick={() => setShowForm(true)} className="hidden sm:flex gap-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm rounded-lg px-5">
             <Plus size={18} />メンバー追加
@@ -459,6 +484,50 @@ const MembersPage = () => {
         >
           <Plus size={24} />
         </button>
+      )}
+
+      {/* スタッフ（顧問・監督・コーチ） */}
+      {staffMembers.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4 pb-2 border-b-2 border-slate-200">
+            <h2 className="font-black text-lg text-slate-600 tracking-tight">顧問・監督・コーチ</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+            {staffMembers.map((member) => (
+              <div key={member.id} className="h-full">
+                {editingMember?.id === member.id ? (
+                  <div className="p-1.5 rounded-2xl border-2 border-purple-300 bg-white">
+                    <MemberForm initial={member} onSave={handleUpdate} onCancel={() => setEditingMember(null)} />
+                  </div>
+                ) : (
+                  <MemberCard member={member} isStaff={isStaff} onEdit={(m) => { setShowForm(false); setEditingMember(m); }} onDelete={handleDelete} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 幹部サマリー */}
+      {leaders.length > 0 && (
+        <div className="mb-8 p-4 sm:p-5 rounded-2xl bg-purple-50 border-2 border-purple-100">
+          <p className="text-[10px] font-black text-purple-400 tracking-widest uppercase mb-3">Leadership</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {leaders.map(({ key, label, member }) => (
+              <div key={key} className="flex flex-col items-center text-center gap-1">
+                <div className="w-12 h-12 rounded-full bg-white border-2 border-purple-200 flex items-center justify-center overflow-hidden shadow-sm">
+                  {member!.photo_url ? (
+                    <img src={member!.photo_url} alt={member!.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-lg font-black text-purple-300">{member!.name.charAt(0)}</span>
+                  )}
+                </div>
+                <span className="text-[10px] font-black text-purple-500 bg-purple-100 px-2 py-0.5 rounded-full">{label}</span>
+                <span className="text-xs font-bold text-gray-800 leading-tight">{member!.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* 現役部員 */}
@@ -490,40 +559,6 @@ const MembersPage = () => {
           </div>
         )}
       </div>
-
-      {/* スタッフセクション */}
-      {staffMembers.length > 0 && (
-        <div className="mt-10">
-          <div className="flex items-center gap-3 mb-5 pb-2 border-b-2 border-slate-200">
-            <h2 className="font-black text-lg text-slate-600 tracking-tight">スタッフ</h2>
-            <span className="text-sm font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
-              {staffMembers.length}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-            {staffMembers.map((member) => (
-              <div key={member.id} className="h-full">
-                {editingMember?.id === member.id ? (
-                  <div className="p-1.5 rounded-2xl border-2 border-purple-300 bg-white">
-                    <MemberForm
-                      initial={member}
-                      onSave={handleUpdate}
-                      onCancel={() => setEditingMember(null)}
-                    />
-                  </div>
-                ) : (
-                  <MemberCard
-                    member={member}
-                    isStaff={isStaff}
-                    onEdit={(m) => { setShowForm(false); setEditingMember(m); }}
-                    onDelete={handleDelete}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* 3年生セクション */}
       {thirdYearMembers.length > 0 && (
