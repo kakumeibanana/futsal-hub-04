@@ -1,6 +1,6 @@
 import { Users, Trophy, Target, Heart } from "lucide-react";
 import { motion } from "framer-motion";
-import teamPhoto from "@/assets/team-photo.jpg";
+import teamPhoto from "@/assets/20260430_075513753_iOS.jpg";
 
 const stats = [
   { icon: Users, label: "部員数", value: "22名" },
