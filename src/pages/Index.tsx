@@ -8,7 +8,7 @@ import { useNewsList } from "@/hooks/useNews";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-futsal.jpg";
-import gasshukuImg from "@/assets/フットサル部合宿.jpeg";
+import gasshukuImg from "@/assets/20260430_075513753_iOS.jpg";
 
 const categoryColor: Record<string, string> = {
   重要: "bg-red-100 text-red-700",
