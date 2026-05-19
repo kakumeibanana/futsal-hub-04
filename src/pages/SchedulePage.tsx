@@ -199,7 +199,7 @@ const SchedulePage = () => {
 
       <div className="grid md:grid-cols-[300px_1fr] gap-8">
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           <div className="rounded-xl border border-border bg-card p-4 overflow-hidden">
             <Calendar
               mode="single"
@@ -240,7 +240,7 @@ const SchedulePage = () => {
         </div>
 
         {/* Event list */}
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           {loading && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Loader2 size={32} className="animate-spin text-primary mb-4" />
