@@ -13,7 +13,7 @@ const tagLabels: Record<EventType, string> = {
 };
 
 const ScheduleTag = ({ type }: { type: EventType }) => (
-  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${tagStyles[type]}`}>
+  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 ${tagStyles[type]}`}>
     {tagLabels[type]}
   </span>
 );
