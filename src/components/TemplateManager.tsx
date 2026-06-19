@@ -130,7 +130,7 @@ const TemplateManager = ({ onClose }: TemplateManagerProps) => {
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-xl bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto max-h-[90vh]"
+        className="relative w-full max-w-xl bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto overflow-x-hidden max-h-[90vh]"
       >
         <button
           onClick={onClose}
@@ -140,11 +140,11 @@ const TemplateManager = ({ onClose }: TemplateManagerProps) => {
         </button>
 
         <div className="p-6 sm:p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-foreground">テンプレート管理</h2>
+          <div className="flex items-center gap-3 mb-6 pr-10">
+            <h2 className="text-xl font-bold text-foreground flex-1">テンプレート管理</h2>
             <button
               onClick={openNew}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors mr-10"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shrink-0"
             >
               <Plus size={14} />
               追加
@@ -282,7 +282,7 @@ const TemplateForm = ({ form, onChange, onSave, onCancel, saving, error, inputCl
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div>
+        <div className="min-w-0">
           <label className="text-xs font-medium text-foreground mb-1 block">タイトル</label>
           <input
             type="text"
@@ -292,7 +292,7 @@ const TemplateForm = ({ form, onChange, onSave, onCancel, saving, error, inputCl
             className={inputClass}
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="text-xs font-medium text-foreground mb-1 block">場所</label>
           <input
             type="text"
@@ -305,7 +305,7 @@ const TemplateForm = ({ form, onChange, onSave, onCancel, saving, error, inputCl
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div>
+        <div className="min-w-0">
           <label className="text-xs font-medium text-foreground mb-1 block">開始時間</label>
           <input
             type="time"
@@ -314,7 +314,7 @@ const TemplateForm = ({ form, onChange, onSave, onCancel, saving, error, inputCl
             className={inputClass}
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="text-xs font-medium text-foreground mb-1 block">終了時間</label>
           <input
             type="time"

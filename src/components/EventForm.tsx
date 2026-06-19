@@ -199,7 +199,7 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto max-h-[90vh]"
+        className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto overflow-x-hidden max-h-[90vh]"
       >
         <button
           onClick={onClose}
@@ -335,7 +335,7 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
 
             {!isAllDay && (
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                <div className="min-w-0">
                   <label className="text-sm font-medium text-foreground mb-1 block">開始時間</label>
                   <input
                     type="time"
@@ -344,7 +344,7 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
                     className={inputClass}
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-sm font-medium text-foreground mb-1 block">終了時間</label>
                   <input
                     type="time"
