@@ -179,7 +179,49 @@ export type Database = {
           },
         ]
       }
-      schedule_events: {
+      event_templates: {
+        Row: {
+          id: string
+          name: string
+          type: string
+          title: string
+          location: string
+          detail: string
+          belongings: string
+          start_time: string | null
+          end_time: string | null
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          type: string
+          title?: string
+          location?: string
+          detail?: string
+          belongings?: string
+          start_time?: string | null
+          end_time?: string | null
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          type?: string
+          title?: string
+          location?: string
+          detail?: string
+          belongings?: string
+          start_time?: string | null
+          end_time?: string | null
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+schedule_events: {
         Row: {
           belongings: string
           created_at: string

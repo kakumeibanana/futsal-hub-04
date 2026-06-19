@@ -3,9 +3,10 @@ import { useSearchParams } from "react-router-dom";
 import { Calendar } from "@/components/ui/calendar";
 import ScheduleCard from "@/components/ScheduleCard";
 import EventForm from "@/components/EventForm";
+import TemplateManager from "@/components/TemplateManager";
 import {
   CalendarDays, Loader2, AlertCircle,
-  X, MapPin, Clock, Info, Briefcase, Plus, Edit2, Trash2, Bell, BellOff,
+  X, MapPin, Clock, Info, Briefcase, Plus, Edit2, Trash2, Bell, BellOff, FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +56,7 @@ const SchedulePage = () => {
   const [showForm, setShowForm] = useState(false);
   const [duplicateValues, setDuplicateValues] = useState<MappedEvent | null>(null);
   const [editingEvent, setEditingEvent] = useState<MappedEvent | null>(null);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [notificationTemplate, setNotificationTemplate] = useState<{
     title: string; date: string; startTime: string; endTime: string;
     type: "practice"; location: string; belongings: string;
@@ -185,6 +187,14 @@ const SchedulePage = () => {
                 <span className="hidden sm:inline">{isSubscribed ? "通知ON" : "通知OFF"}</span>
               </button>
             )}
+            <button
+              onClick={() => setShowTemplateManager(true)}
+              title="テンプレートを管理"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted text-muted-foreground text-xs sm:text-sm font-semibold hover:bg-secondary transition-colors flex-shrink-0 border border-border"
+            >
+              <FileText size={14} />
+              <span className="hidden sm:inline">テンプレート</span>
+            </button>
             <button
               onClick={() => setShowForm(true)}
               className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors flex-shrink-0"
@@ -387,6 +397,13 @@ const SchedulePage = () => {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* テンプレート管理（スタッフのみ） */}
+      <AnimatePresence>
+        {showTemplateManager && (
+          <TemplateManager onClose={() => setShowTemplateManager(false)} />
         )}
       </AnimatePresence>
 

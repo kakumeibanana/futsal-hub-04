@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { X, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { X, Loader2, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -25,9 +25,21 @@ interface EventFormProps {
   eventId?: string;
 }
 
+interface Template {
+  id: string;
+  name: string;
+  type: "practice" | "match" | "event";
+  title: string;
+  location: string;
+  detail: string;
+  belongings: string;
+  start_time: string | null;
+  end_time: string | null;
+}
+
 const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps) => {
   const isEditing = !!eventId;
-  const { memberName } = useAuth();
+  const { memberName, isStaff } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,18 +52,70 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
   const [type, setType] = useState<"match" | "practice" | "event">(initialValues?.type ?? "practice");
   const [detail, setDetail] = useState(initialValues?.detail ?? "");
   const [belongings, setBelongings] = useState(initialValues?.belongings ?? "");
-  const [lineNotify, setLineNotify] = useState<"none" | "immediate" | "scheduled">(initialValues?.lineNotify ?? "none");
+  const [lineNotify, setLineNotify] = useState<"none" | "immediate" | "scheduled">(
+    initialValues?.lineNotify ?? "none"
+  );
   const [lineSendAt, setLineSendAt] = useState(initialValues?.lineSendAt ?? "");
+
+  // テンプレート
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  // 編集時：既存のLINE設定を取得
+  useEffect(() => {
+    if (!isEditing || !eventId) return;
+    supabase
+      .from("schedule_events")
+      .select("line_notify_type, line_send_at")
+      .eq("id", eventId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setLineNotify((data.line_notify_type as "none" | "immediate" | "scheduled") ?? "none");
+          if (data.line_send_at) {
+            setLineSendAt(new Date(data.line_send_at).toISOString().slice(0, 16));
+          }
+        }
+      });
+  }, [isEditing, eventId]);
+
+  // テンプレート一覧取得（リーダーのみ）
+  useEffect(() => {
+    if (!isStaff) return;
+    supabase
+      .from("event_templates")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .then(({ data }) => {
+        if (data) setTemplates(data as Template[]);
+      });
+  }, [isStaff]);
+
+  const applyTemplate = (t: Template) => {
+    if (t.title) setTitle(t.title);
+    if (t.location) setLocation(t.location);
+    if (t.detail) setDetail(t.detail);
+    if (t.belongings) setBelongings(t.belongings);
+    if (t.start_time) setStartTime(t.start_time);
+    if (t.end_time) setEndTime(t.end_time);
+    setType(t.type);
+    setIsAllDay(false);
+    setShowTemplatePicker(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !date) return;
+    if (lineNotify === "scheduled" && !lineSendAt) {
+      setError("予約配信の送信日時を入力してください");
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      const fields = {
+      const baseFields = {
         title,
         date,
         start_time: isAllDay ? null : startTime || null,
@@ -63,17 +127,28 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
         belongings,
       };
 
+      let savedEventId = eventId;
+
       if (isEditing) {
+        // 編集時：LINE設定も更新し、line_sentをリセット（再配信を可能にする）
         const { error: updateError } = await supabase
           .from("schedule_events")
-          .update(fields)
-          .eq("id", eventId);
+          .update({
+            ...baseFields,
+            line_notify_type: lineNotify,
+            line_send_at:
+              lineNotify === "scheduled" && lineSendAt
+                ? new Date(lineSendAt).toISOString()
+                : null,
+            line_sent: false,
+          })
+          .eq("id", eventId!);
         if (updateError) throw updateError;
       } else {
         const { data: newEvent, error: insertError } = await supabase
           .from("schedule_events")
           .insert({
-            ...fields,
+            ...baseFields,
             line_notify_type: lineNotify,
             line_send_at:
               lineNotify === "scheduled" && lineSendAt
@@ -84,15 +159,16 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
           })
           .select()
           .single();
-
         if (insertError) throw insertError;
+        savedEventId = newEvent.id;
+      }
 
-        if (lineNotify === "immediate" && newEvent) {
-          const { error: fnError } = await supabase.functions.invoke("line-notify", {
-            body: { event_id: newEvent.id },
-          });
-          if (fnError) throw new Error("LINE送信に失敗しました: " + fnError.message);
-        }
+      // 「今すぐ送る」の場合は即時送信
+      if (lineNotify === "immediate" && savedEventId) {
+        const { error: fnError } = await supabase.functions.invoke("line-notify", {
+          body: { event_id: savedEventId },
+        });
+        if (fnError) throw new Error("LINE送信に失敗しました: " + fnError.message);
       }
 
       onSaved();
@@ -105,6 +181,10 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
 
   const inputClass =
     "w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50";
+
+  const practiceTemplates = templates.filter((t) => t.type === "practice");
+  const matchTemplates = templates.filter((t) => t.type === "match");
+  const eventTemplates = templates.filter((t) => t.type === "event");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -129,7 +209,72 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
         </button>
 
         <div className="p-6 sm:p-8">
-          <h2 className="text-xl font-bold text-foreground mb-6">{isEditing ? "イベントを編集" : "イベントを追加"}</h2>
+          <h2 className="text-xl font-bold text-foreground mb-6">
+            {isEditing ? "イベントを編集" : "イベントを追加"}
+          </h2>
+
+          {/* テンプレート選択（リーダーのみ） */}
+          {isStaff && templates.length > 0 && (
+            <div className="mb-5 relative">
+              <button
+                type="button"
+                onClick={() => setShowTemplatePicker((v) => !v)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-muted/50 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors w-full justify-between"
+              >
+                <span>テンプレートを使う</span>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${showTemplatePicker ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              <AnimatePresence>
+                {showTemplatePicker && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg z-20 overflow-hidden"
+                  >
+                    {[
+                      { label: "練習", items: practiceTemplates },
+                      { label: "試合", items: matchTemplates },
+                      { label: "イベント", items: eventTemplates },
+                    ]
+                      .filter((g) => g.items.length > 0)
+                      .map((group) => (
+                        <div key={group.label}>
+                          <p className="text-xs font-semibold text-muted-foreground px-3 py-1.5 bg-muted/50 border-b border-border">
+                            {group.label}
+                          </p>
+                          {group.items.map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => applyTemplate(t)}
+                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors flex items-center justify-between"
+                            >
+                              <span className="font-medium">{t.name}</span>
+                              {(t.start_time || t.location) && (
+                                <span className="text-xs text-muted-foreground">
+                                  {[
+                                    t.start_time &&
+                                      `${t.start_time}${t.end_time ? `-${t.end_time}` : ""}`,
+                                    t.location,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" / ")}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -244,39 +389,42 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
               />
             </div>
 
-            {!isEditing && (
-              <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
-                <p className="text-sm font-semibold text-foreground">LINE通知</p>
-                <div className="flex gap-2">
-                  {(["none", "immediate", "scheduled"] as const).map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setLineNotify(n)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                        lineNotify === n
-                          ? "bg-green-600 text-white border-green-600"
-                          : "bg-muted text-muted-foreground border-border hover:bg-secondary"
-                      }`}
-                    >
-                      {n === "none" ? "送らない" : n === "immediate" ? "今すぐ送る" : "予約配信"}
-                    </button>
-                  ))}
-                </div>
-                {lineNotify === "scheduled" && (
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-1 block">送信日時</label>
-                    <input
-                      type="datetime-local"
-                      value={lineSendAt}
-                      onChange={(e) => setLineSendAt(e.target.value)}
-                      required={lineNotify === "scheduled"}
-                      className={inputClass}
-                    />
-                  </div>
-                )}
+            {/* LINE通知 */}
+            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
+              <p className="text-sm font-semibold text-foreground">LINE通知</p>
+              <div className="flex gap-2">
+                {(["none", "immediate", "scheduled"] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setLineNotify(n)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                      lineNotify === n
+                        ? "bg-green-600 text-white border-green-600"
+                        : "bg-muted text-muted-foreground border-border hover:bg-secondary"
+                    }`}
+                  >
+                    {n === "none" ? "送らない" : n === "immediate" ? "今すぐ送る" : "予約配信"}
+                  </button>
+                ))}
               </div>
-            )}
+              {lineNotify === "scheduled" && (
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1 block">送信日時</label>
+                  <input
+                    type="datetime-local"
+                    value={lineSendAt}
+                    onChange={(e) => setLineSendAt(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              )}
+              {isEditing && lineNotify !== "none" && (
+                <p className="text-xs text-muted-foreground">
+                  ※ 保存すると配信設定がリセットされ、再配信されます。
+                </p>
+              )}
+            </div>
 
             {error && (
               <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-lg">
