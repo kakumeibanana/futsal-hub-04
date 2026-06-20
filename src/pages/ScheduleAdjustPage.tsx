@@ -712,11 +712,11 @@ const SummaryTable = ({
 }) => (
   <div className="mb-8">
     <div className="text-sm font-semibold text-foreground mb-3">集計結果</div>
-    <div className="overflow-x-auto rounded-xl border border-border">
+    <div className="overflow-x-auto overflow-y-scroll max-h-96 rounded-xl border border-border">
       <table className="w-full text-sm">
-        <thead>
+        <thead className="sticky top-0 z-10">
           <tr className="border-b border-border bg-muted/50">
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground sticky left-0 bg-muted/50">名前</th>
+            <th className="text-left px-3 py-2 font-medium text-muted-foreground sticky left-0 z-20 bg-muted/50">名前</th>
             {dates.map((d) => {
               const key = `${d.date}_${d.time_slot ?? ""}`;
               return (
