@@ -84,7 +84,7 @@ export type Database = {
           id: string
           is_closed: boolean
           target_members: string[]
-          target_type: string
+          target_type: string[]
           title: string
         }
         Insert: {

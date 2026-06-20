@@ -16,7 +16,7 @@ interface Event {
   created_by: string;
   created_at: string;
   decide_count: number;
-  target_type: string;
+  target_type: string[];
   target_members: string[];
   is_closed: boolean;
 }
@@ -77,22 +77,36 @@ const formatSlotLabel = (date: string, timeSlot: string | null) => {
 };
 
 const checkIsTarget = (event: Event, memberName: string, memberGrade: string | null): boolean => {
-  if (event.target_type === "all") return true;
-  if (event.target_type === "custom") return (event.target_members ?? []).includes(memberName);
-  return memberGrade === event.target_type;
+  const types = event.target_type ?? ["all"];
+  if (types.includes("all")) return true;
+  if (memberGrade && types.includes(memberGrade)) return true;
+  if (types.includes("custom") && (event.target_members ?? []).includes(memberName)) return true;
+  return false;
 };
 
 // ── ターゲット選択UI ──────────────────────────────────────────
 const TargetSelector = ({
   value, onChange, targetMembers, onTargetMembersChange, allMembers,
 }: {
-  value: string;
-  onChange: (v: string) => void;
+  value: string[];
+  onChange: (v: string[]) => void;
   targetMembers: string[];
   onTargetMembersChange: (names: string[]) => void;
   allMembers: Member[];
 }) => {
-  const targets = ["all", "1年生", "2年生", "3年生", "custom"];
+  const grades = ["1年生", "2年生", "3年生"];
+
+  const toggleOption = (t: string) => {
+    if (t === "all") {
+      onChange(["all"]);
+      return;
+    }
+    const without = value.filter((v) => v !== "all");
+    const next = without.includes(t)
+      ? without.filter((v) => v !== t)
+      : [...without, t];
+    onChange(next.length === 0 ? ["all"] : next);
+  };
 
   const toggleMember = (name: string) => {
     onTargetMembersChange(
@@ -102,26 +116,50 @@ const TargetSelector = ({
     );
   };
 
+  const isActive = (t: string) => value.includes(t);
+
   return (
     <div>
       <label className="text-sm font-medium text-foreground mb-1.5 block">対象者</label>
       <div className="flex flex-wrap gap-2 mb-3">
-        {targets.map((t) => (
+        <button
+          type="button"
+          onClick={() => toggleOption("all")}
+          className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+            isActive("all")
+              ? "bg-primary text-primary-foreground border-primary"
+              : "border-border bg-muted/50 text-muted-foreground hover:bg-muted"
+          }`}
+        >
+          全員
+        </button>
+        {grades.map((t) => (
           <button
             key={t}
             type="button"
-            onClick={() => onChange(t)}
+            onClick={() => toggleOption(t)}
             className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${
-              value === t
+              isActive(t)
                 ? "bg-primary text-primary-foreground border-primary"
                 : "border-border bg-muted/50 text-muted-foreground hover:bg-muted"
             }`}
           >
-            {TARGET_LABELS[t]}
+            {t}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => toggleOption("custom")}
+          className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+            isActive("custom")
+              ? "bg-primary text-primary-foreground border-primary"
+              : "border-border bg-muted/50 text-muted-foreground hover:bg-muted"
+          }`}
+        >
+          個人指定
+        </button>
       </div>
-      {value === "custom" && (
+      {isActive("custom") && (
         <div className="rounded-xl border border-border bg-muted/30 p-3 max-h-48 overflow-y-auto">
           <div className="text-xs text-muted-foreground mb-2">
             メンバーを選択（{targetMembers.length}人選択中）
@@ -200,9 +238,10 @@ const EventList = ({
                       <Lock size={10} />締め切り済み
                     </span>
                   )}
-                  {event.target_type !== "all" && (
+                  {!(event.target_type ?? []).includes("all") && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 border border-blue-500/20">
-                      <Users size={10} />{TARGET_LABELS[event.target_type]}対象
+                      <Users size={10} />
+                      {(event.target_type ?? []).map((t) => TARGET_LABELS[t] ?? t).join("・")}対象
                     </span>
                   )}
                   {!isTarget ? (
@@ -245,7 +284,7 @@ const CreateEvent = ({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [decideCount, setDecideCount] = useState(1);
-  const [targetType, setTargetType] = useState("all");
+  const [targetType, setTargetType] = useState<string[]>(["all"]);
   const [targetMembers, setTargetMembers] = useState<string[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<{ date: string; timeSlot: string | null }[]>([]);
   const [customSlot, setCustomSlot] = useState("");
@@ -279,7 +318,7 @@ const CreateEvent = ({
       toast({ title: "候補日を1つ以上選択してください", variant: "destructive" });
       return;
     }
-    if (targetType === "custom" && targetMembers.length === 0) {
+    if (targetType.includes("custom") && targetMembers.length === 0) {
       toast({ title: "個人指定の場合は1人以上選択してください", variant: "destructive" });
       return;
     }
@@ -293,7 +332,7 @@ const CreateEvent = ({
         created_by: memberName,
         decide_count: decideCount,
         target_type: targetType,
-        target_members: targetType === "custom" ? targetMembers : [],
+        target_members: targetType.includes("custom") ? targetMembers : [],
       })
       .select()
       .single();
@@ -454,7 +493,9 @@ const EditEvent = ({
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? "");
   const [decideCount, setDecideCount] = useState(event.decide_count);
-  const [targetType, setTargetType] = useState(event.target_type ?? "all");
+  const [targetType, setTargetType] = useState<string[]>(
+    Array.isArray(event.target_type) ? event.target_type : [event.target_type ?? "all"]
+  );
   const [targetMembers, setTargetMembers] = useState<string[]>(event.target_members ?? []);
   const [selectedSlots, setSelectedSlots] = useState<{ date: string; timeSlot: string | null }[]>(
     dates.map((d) => ({ date: d.date, timeSlot: d.time_slot }))
@@ -492,7 +533,7 @@ const EditEvent = ({
       toast({ title: "候補日を1つ以上選択してください", variant: "destructive" });
       return;
     }
-    if (targetType === "custom" && targetMembers.length === 0) {
+    if (targetType.includes("custom") && targetMembers.length === 0) {
       toast({ title: "個人指定の場合は1人以上選択してください", variant: "destructive" });
       return;
     }
@@ -505,7 +546,7 @@ const EditEvent = ({
         description: description.trim() || null,
         decide_count: decideCount,
         target_type: targetType,
-        target_members: targetType === "custom" ? targetMembers : [],
+        target_members: targetType.includes("custom") ? targetMembers : [],
       })
       .eq("id", event.id)
       .select()
@@ -952,10 +993,11 @@ const EventDetail = ({
       </div>
 
       {/* ターゲットバッジ */}
-      {currentEvent.target_type !== "all" && (
+      {!(currentEvent.target_type ?? []).includes("all") && (
         <div className="flex items-center gap-2 mb-2 ml-12">
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 border border-blue-500/20">
-            <Users size={11} />{TARGET_LABELS[currentEvent.target_type]}対象
+            <Users size={11} />
+            {(currentEvent.target_type ?? []).map((t) => TARGET_LABELS[t] ?? t).join("・")}対象
           </span>
         </div>
       )}
