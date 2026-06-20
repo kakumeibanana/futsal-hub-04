@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { CalendarCheck, Plus, X, Minus, Send, RotateCcw, ChevronLeft, Trash2, MessageCircle, Clock, Edit2 } from "lucide-react";
+import { CalendarCheck, Plus, X, Minus, Send, RotateCcw, ChevronLeft, Trash2, MessageCircle, Edit2, Lock, Unlock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +16,9 @@ interface Event {
   created_by: string;
   created_at: string;
   decide_count: number;
+  target_type: string;
+  target_members: string[];
+  is_closed: boolean;
 }
 
 interface EventDate {
@@ -42,6 +45,19 @@ interface Comment {
   created_at: string;
 }
 
+interface Member {
+  name: string;
+  grade: string | null;
+}
+
+const TARGET_LABELS: Record<string, string> = {
+  all: "全員",
+  "1年生": "1年生",
+  "2年生": "2年生",
+  "3年生": "3年生",
+  custom: "個人指定",
+};
+
 const statusConfig = {
   available:   { label: "○", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30", score: 2 },
   maybe:       { label: "△", className: "bg-amber-500/15 text-amber-600 border-amber-500/30", score: 1 },
@@ -60,14 +76,91 @@ const formatSlotLabel = (date: string, timeSlot: string | null) => {
   return timeSlot ? `${base} ${timeSlot}` : base;
 };
 
+const checkIsTarget = (event: Event, memberName: string, memberGrade: string | null): boolean => {
+  if (event.target_type === "all") return true;
+  if (event.target_type === "custom") return (event.target_members ?? []).includes(memberName);
+  return memberGrade === event.target_type;
+};
+
+// ── ターゲット選択UI ──────────────────────────────────────────
+const TargetSelector = ({
+  value, onChange, targetMembers, onTargetMembersChange, allMembers,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  targetMembers: string[];
+  onTargetMembersChange: (names: string[]) => void;
+  allMembers: Member[];
+}) => {
+  const targets = ["all", "1年生", "2年生", "3年生", "custom"];
+
+  const toggleMember = (name: string) => {
+    onTargetMembersChange(
+      targetMembers.includes(name)
+        ? targetMembers.filter((n) => n !== name)
+        : [...targetMembers, name]
+    );
+  };
+
+  return (
+    <div>
+      <label className="text-sm font-medium text-foreground mb-1.5 block">対象者</label>
+      <div className="flex flex-wrap gap-2 mb-3">
+        {targets.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onChange(t)}
+            className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+              value === t
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border bg-muted/50 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {TARGET_LABELS[t]}
+          </button>
+        ))}
+      </div>
+      {value === "custom" && (
+        <div className="rounded-xl border border-border bg-muted/30 p-3 max-h-48 overflow-y-auto">
+          <div className="text-xs text-muted-foreground mb-2">
+            メンバーを選択（{targetMembers.length}人選択中）
+          </div>
+          <div className="space-y-1">
+            {allMembers.map((m) => (
+              <label
+                key={m.name}
+                className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded-lg px-2 py-1"
+              >
+                <input
+                  type="checkbox"
+                  checked={targetMembers.includes(m.name)}
+                  onChange={() => toggleMember(m.name)}
+                  className="accent-primary"
+                />
+                <span className="text-sm text-foreground">{m.name}</span>
+                {m.grade && (
+                  <span className="text-xs text-muted-foreground">{m.grade}</span>
+                )}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── イベント一覧 ──────────────────────────────────────────
 const EventList = ({
-  events, onSelect, onCreateNew, isStaff,
+  events, onSelect, onCreateNew, isStaff, memberName, memberGrade,
 }: {
   events: Event[];
   onSelect: (e: Event) => void;
   onCreateNew: () => void;
   isStaff: boolean;
+  memberName: string;
+  memberGrade: string | null;
 }) => (
   <div>
     <div className="flex items-center justify-between mb-6">
@@ -88,22 +181,50 @@ const EventList = ({
       </div>
     ) : (
       <div className="space-y-3">
-        {events.map((event, i) => (
-          <motion.button
-            key={event.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            onClick={() => onSelect(event)}
-            className="w-full text-left p-4 rounded-xl border border-border bg-card hover:bg-muted/50 transition-all"
-          >
-            <div className="font-semibold text-foreground">{event.title}</div>
-            {event.description && <div className="text-sm text-muted-foreground mt-1">{event.description}</div>}
-            <div className="text-xs text-muted-foreground mt-2">
-              作成者: {event.created_by} · {new Date(event.created_at).toLocaleDateString("ja-JP")}
-            </div>
-          </motion.button>
-        ))}
+        {events.map((event, i) => {
+          const isTarget = checkIsTarget(event, memberName, memberGrade);
+          return (
+            <motion.button
+              key={event.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              onClick={() => onSelect(event)}
+              className="w-full text-left p-4 rounded-xl border border-border bg-card hover:bg-muted/50 transition-all"
+            >
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div className="font-semibold text-foreground">{event.title}</div>
+                <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
+                  {event.is_closed && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border">
+                      <Lock size={10} />締め切り済み
+                    </span>
+                  )}
+                  {event.target_type !== "all" && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                      <Users size={10} />{TARGET_LABELS[event.target_type]}対象
+                    </span>
+                  )}
+                  {!isTarget ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-muted/50 text-muted-foreground border border-border">
+                      関係なし
+                    </span>
+                  ) : !event.is_closed ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                      投票してください
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              {event.description && (
+                <div className="text-sm text-muted-foreground mt-1">{event.description}</div>
+              )}
+              <div className="text-xs text-muted-foreground mt-2">
+                作成者: {event.created_by} · {new Date(event.created_at).toLocaleDateString("ja-JP")}
+              </div>
+            </motion.button>
+          );
+        })}
       </div>
     )}
   </div>
@@ -113,9 +234,10 @@ const EventList = ({
 const TIME_SLOTS = ["午前", "午後", "夜", "終日"];
 
 const CreateEvent = ({
-  memberName, onCreated, onCancel,
+  memberName, allMembers, onCreated, onCancel,
 }: {
   memberName: string;
+  allMembers: Member[];
   onCreated: () => void;
   onCancel: () => void;
 }) => {
@@ -123,6 +245,8 @@ const CreateEvent = ({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [decideCount, setDecideCount] = useState(1);
+  const [targetType, setTargetType] = useState("all");
+  const [targetMembers, setTargetMembers] = useState<string[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<{ date: string; timeSlot: string | null }[]>([]);
   const [customSlot, setCustomSlot] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -155,11 +279,22 @@ const CreateEvent = ({
       toast({ title: "候補日を1つ以上選択してください", variant: "destructive" });
       return;
     }
+    if (targetType === "custom" && targetMembers.length === 0) {
+      toast({ title: "個人指定の場合は1人以上選択してください", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
 
     const { data: event, error } = await supabase
       .from("events")
-      .insert({ title: title.trim(), description: description.trim() || null, created_by: memberName, decide_count: decideCount })
+      .insert({
+        title: title.trim(),
+        description: description.trim() || null,
+        created_by: memberName,
+        decide_count: decideCount,
+        target_type: targetType,
+        target_members: targetType === "custom" ? targetMembers : [],
+      })
       .select()
       .single();
 
@@ -193,6 +328,13 @@ const CreateEvent = ({
           <label className="text-sm font-medium text-foreground mb-1.5 block">メモ（任意）</label>
           <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="例: 場所は第一体育館" className="h-11" />
         </div>
+        <TargetSelector
+          value={targetType}
+          onChange={setTargetType}
+          targetMembers={targetMembers}
+          onTargetMembersChange={setTargetMembers}
+          allMembers={allMembers}
+        />
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">決定候補数（上位N日を色付け）</label>
           <div className="flex items-center gap-3">
@@ -300,10 +442,11 @@ const CreateEvent = ({
 
 // ── イベント編集 ──────────────────────────────────────────
 const EditEvent = ({
-  event, dates, onUpdated, onCancel,
+  event, dates, allMembers, onUpdated, onCancel,
 }: {
   event: Event;
   dates: EventDate[];
+  allMembers: Member[];
   onUpdated: (updatedEvent: Event, updatedDates: EventDate[]) => void;
   onCancel: () => void;
 }) => {
@@ -311,6 +454,8 @@ const EditEvent = ({
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? "");
   const [decideCount, setDecideCount] = useState(event.decide_count);
+  const [targetType, setTargetType] = useState(event.target_type ?? "all");
+  const [targetMembers, setTargetMembers] = useState<string[]>(event.target_members ?? []);
   const [selectedSlots, setSelectedSlots] = useState<{ date: string; timeSlot: string | null }[]>(
     dates.map((d) => ({ date: d.date, timeSlot: d.time_slot }))
   );
@@ -347,11 +492,21 @@ const EditEvent = ({
       toast({ title: "候補日を1つ以上選択してください", variant: "destructive" });
       return;
     }
+    if (targetType === "custom" && targetMembers.length === 0) {
+      toast({ title: "個人指定の場合は1人以上選択してください", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
 
     const { data: updatedEvent, error: updateError } = await supabase
       .from("events")
-      .update({ title: title.trim(), description: description.trim() || null, decide_count: decideCount })
+      .update({
+        title: title.trim(),
+        description: description.trim() || null,
+        decide_count: decideCount,
+        target_type: targetType,
+        target_members: targetType === "custom" ? targetMembers : [],
+      })
       .eq("id", event.id)
       .select()
       .single();
@@ -407,6 +562,13 @@ const EditEvent = ({
           <label className="text-sm font-medium text-foreground mb-1.5 block">メモ（任意）</label>
           <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="例: 場所は第一体育館" className="h-11" />
         </div>
+        <TargetSelector
+          value={targetType}
+          onChange={setTargetType}
+          targetMembers={targetMembers}
+          onTargetMembersChange={setTargetMembers}
+          allMembers={allMembers}
+        />
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">決定候補数（上位N日を色付け）</label>
           <div className="flex items-center gap-3">
@@ -550,7 +712,6 @@ const SummaryTable = ({
               })}
             </tr>
           ))}
-          {/* スコア行 */}
           <tr className="bg-muted/30">
             <td className="px-3 py-2 font-semibold text-foreground text-sm sticky left-0 bg-muted/30">スコア</td>
             {dateScores.map((ds) => {
@@ -573,11 +734,13 @@ const SummaryTable = ({
 
 // ── 回答・集計・コメント ──────────────────────────────────────────
 const EventDetail = ({
-  event, memberName, isStaff, onBack, onDeleted, onUpdated,
+  event, memberName, memberGrade, isStaff, allMembers, onBack, onDeleted, onUpdated,
 }: {
   event: Event;
   memberName: string;
+  memberGrade: string | null;
   isStaff: boolean;
+  allMembers: Member[];
   onBack: () => void;
   onDeleted: () => void;
   onUpdated: (updatedEvent: Event) => void;
@@ -594,6 +757,10 @@ const EventDetail = ({
   const [newComment, setNewComment] = useState("");
   const [sendingComment, setSendingComment] = useState(false);
   const [updatingResponse, setUpdatingResponse] = useState(false);
+  const [closingEvent, setClosingEvent] = useState(false);
+
+  const isTarget = checkIsTarget(currentEvent, memberName, memberGrade);
+  const canVote = isTarget && !currentEvent.is_closed;
 
   useEffect(() => {
     const load = async () => {
@@ -608,7 +775,6 @@ const EventDetail = ({
       setResponses((responsesData ?? []) as Response[]);
       setComments(commentsData as Comment[] ?? []);
 
-      // mySelections は EventDate の id をキーとして管理する
       const mine: Record<string, Availability | null> = {};
       (responsesData ?? [])
         .filter((r) => r.member_name === memberName)
@@ -654,7 +820,6 @@ const EventDetail = ({
       };
     });
 
-    // 先に既存IDを保存 → 新規挿入 → 成功したら旧データ削除（データロスト防止）
     const { data: existingData } = await supabase
       .from("responses").select("id")
       .eq("event_id", event.id).eq("member_name", memberName);
@@ -677,6 +842,24 @@ const EventDetail = ({
     setSubmitted(true);
     setUpdatingResponse(false);
     toast({ title: submitted ? "回答を更新しました！" : "回答を送信しました！" });
+  };
+
+  const handleToggleClose = async () => {
+    const newClosed = !currentEvent.is_closed;
+    setClosingEvent(true);
+    const { data: updated } = await supabase
+      .from("events")
+      .update({ is_closed: newClosed })
+      .eq("id", currentEvent.id)
+      .select()
+      .single();
+    if (updated) {
+      const newEvent = { ...currentEvent, is_closed: newClosed };
+      setCurrentEvent(newEvent);
+      onUpdated(newEvent);
+      toast({ title: newClosed ? "締め切りました" : "締め切りを取り消しました" });
+    }
+    setClosingEvent(false);
   };
 
   const handleSendComment = async () => {
@@ -704,7 +887,6 @@ const EventDetail = ({
     onDeleted();
   };
 
-  // 集計
   const memberNames = [...new Set(responses.map((r) => r.member_name))];
   const dateScores = dates.map((d) => {
     const score = responses
@@ -713,7 +895,6 @@ const EventDetail = ({
     return { date: d.date, time_slot: d.time_slot, score };
   });
 
-  // 上位N位の日程を算出（同点は全て含む）
   const decideCount = currentEvent.decide_count ?? 1;
   const uniqueScores = [...new Set(dateScores.map((d) => d.score))].filter((s) => s > 0).sort((a, b) => b - a);
   const topNThreshold = uniqueScores.length >= decideCount ? uniqueScores[decideCount - 1] : 0;
@@ -727,6 +908,7 @@ const EventDetail = ({
     <EditEvent
       event={currentEvent}
       dates={dates}
+      allMembers={allMembers}
       onUpdated={(updatedEvent, updatedDates) => {
         setCurrentEvent(updatedEvent);
         setDates(updatedDates);
@@ -749,6 +931,16 @@ const EventDetail = ({
         </div>
         {isStaff && (
           <div className="flex items-center gap-1 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleToggleClose}
+              disabled={closingEvent}
+              title={currentEvent.is_closed ? "締め切りを取り消す" : "締め切る"}
+              className={currentEvent.is_closed ? "text-emerald-600 hover:text-emerald-700" : "text-muted-foreground hover:text-amber-600"}
+            >
+              {currentEvent.is_closed ? <Unlock size={18} /> : <Lock size={18} />}
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} className="text-muted-foreground hover:text-foreground">
               <Edit2 size={18} />
             </Button>
@@ -758,57 +950,84 @@ const EventDetail = ({
           </div>
         )}
       </div>
-      {currentEvent.description && <p className="text-sm text-muted-foreground mb-6 ml-12">{currentEvent.description}</p>}
 
-      {/* 回答エリア */}
-      <div className={`mb-8 ${submitted ? "p-4 rounded-xl border border-border bg-muted/20" : ""}`}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-semibold text-foreground">
-            {submitted ? "回答を変更する" : "参加可否を入力してください"}
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-            {memberName} として回答
+      {/* ターゲットバッジ */}
+      {currentEvent.target_type !== "all" && (
+        <div className="flex items-center gap-2 mb-2 ml-12">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 border border-blue-500/20">
+            <Users size={11} />{TARGET_LABELS[currentEvent.target_type]}対象
           </span>
         </div>
-        {!submitted && (
-          <div className="flex flex-wrap gap-3 mb-4">
-            {Object.entries(statusConfig).map(([key, cfg]) => (
-              <div key={key} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${cfg.className}`}>
-                {cfg.label} {key === "available" ? "参加可" : key === "maybe" ? "未定" : "不可"}
-              </div>
-            ))}
+      )}
+
+      {/* 締め切りバナー */}
+      {currentEvent.is_closed && (
+        <div className="mb-4 p-3 rounded-xl bg-muted/50 border border-border flex items-center gap-2">
+          <Lock size={14} className="text-muted-foreground" />
+          <span className="text-sm text-muted-foreground font-medium">この日程調整は締め切り済みです</span>
+        </div>
+      )}
+
+      {/* 対象外バナー */}
+      {!isTarget && (
+        <div className="mb-4 p-3 rounded-xl bg-muted/30 border border-border">
+          <span className="text-sm text-muted-foreground">あなたはこのイベントの対象外です（閲覧のみ可能）</span>
+        </div>
+      )}
+
+      {currentEvent.description && <p className="text-sm text-muted-foreground mb-6 ml-12">{currentEvent.description}</p>}
+
+      {/* 回答エリア（対象者かつ締め切り前のみ表示） */}
+      {canVote && (
+        <div className={`mb-8 ${submitted ? "p-4 rounded-xl border border-border bg-muted/20" : ""}`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-foreground">
+              {submitted ? "回答を変更する" : "参加可否を入力してください"}
+            </div>
+            <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+              {memberName} として回答
+            </span>
           </div>
-        )}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-          {dates.map((slot) => {
-            const status = mySelections[slot.id] ?? null;
-            const cfg = status ? statusConfig[status] : null;
-            return (
-              <button
-                key={slot.id}
-                onClick={() => cycleStatus(slot.id)}
-                className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                  cfg ? cfg.className : "border-border bg-card hover:bg-muted/50 text-foreground"
-                }`}
-              >
-                <span className="text-sm font-medium">{formatSlotLabel(slot.date, slot.time_slot)}</span>
-                {cfg && <span className="text-base font-bold">{cfg.label}</span>}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex gap-3">
-          <Button onClick={handleSubmit} disabled={updatingResponse} className={`h-11 gap-2 font-semibold ${submitted ? "" : "flex-1"}`}>
-            <Send size={16} />
-            {updatingResponse ? "送信中..." : submitted ? "回答を更新する" : "回答を送信"}
-          </Button>
           {!submitted && (
-            <Button variant="outline" onClick={() => setMySelections({})} className="h-11 gap-2">
-              <RotateCcw size={16} />リセット
-            </Button>
+            <div className="flex flex-wrap gap-3 mb-4">
+              {Object.entries(statusConfig).map(([key, cfg]) => (
+                <div key={key} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${cfg.className}`}>
+                  {cfg.label} {key === "available" ? "参加可" : key === "maybe" ? "未定" : "不可"}
+                </div>
+              ))}
+            </div>
           )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+            {dates.map((slot) => {
+              const status = mySelections[slot.id] ?? null;
+              const cfg = status ? statusConfig[status] : null;
+              return (
+                <button
+                  key={slot.id}
+                  onClick={() => cycleStatus(slot.id)}
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                    cfg ? cfg.className : "border-border bg-card hover:bg-muted/50 text-foreground"
+                  }`}
+                >
+                  <span className="text-sm font-medium">{formatSlotLabel(slot.date, slot.time_slot)}</span>
+                  {cfg && <span className="text-base font-bold">{cfg.label}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={handleSubmit} disabled={updatingResponse} className={`h-11 gap-2 font-semibold ${submitted ? "" : "flex-1"}`}>
+              <Send size={16} />
+              {updatingResponse ? "送信中..." : submitted ? "回答を更新する" : "回答を送信"}
+            </Button>
+            {!submitted && (
+              <Button variant="outline" onClick={() => setMySelections({})} className="h-11 gap-2">
+                <RotateCcw size={16} />リセット
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 集計テーブル */}
       {dates.length > 0 && (
@@ -821,7 +1040,7 @@ const EventDetail = ({
         />
       )}
 
-      {/* コメント（集計テーブルの下） */}
+      {/* コメント */}
       <div>
         <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
           <MessageCircle size={16} className="text-primary" />
@@ -871,6 +1090,8 @@ const EventDetail = ({
 const ScheduleAdjustPage = () => {
   const { memberName, isStaff } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
+  const [allMembers, setAllMembers] = useState<Member[]>([]);
+  const [memberGrade, setMemberGrade] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "create" | "detail">("list");
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
@@ -879,7 +1100,21 @@ const ScheduleAdjustPage = () => {
     setEvents((data as Event[]) ?? []);
   };
 
-  useEffect(() => { loadEvents(); }, []);
+  useEffect(() => {
+    loadEvents();
+    supabase
+      .from("members")
+      .select("name, grade")
+      .eq("hidden", false)
+      .order("number")
+      .then(({ data }) => {
+        if (data) {
+          setAllMembers(data as Member[]);
+          const me = data.find((m) => m.name === memberName);
+          if (me) setMemberGrade(me.grade ?? null);
+        }
+      });
+  }, [memberName]);
 
   return (
     <div className="container py-8 sm:py-10 max-w-2xl">
@@ -889,11 +1124,14 @@ const ScheduleAdjustPage = () => {
           onSelect={(e) => { setSelectedEvent(e); setView("detail"); }}
           onCreateNew={() => setView("create")}
           isStaff={isStaff}
+          memberName={memberName}
+          memberGrade={memberGrade}
         />
       )}
       {view === "create" && (
         <CreateEvent
           memberName={memberName}
+          allMembers={allMembers}
           onCreated={() => { loadEvents(); setView("list"); }}
           onCancel={() => setView("list")}
         />
@@ -902,7 +1140,9 @@ const ScheduleAdjustPage = () => {
         <EventDetail
           event={selectedEvent}
           memberName={memberName}
+          memberGrade={memberGrade}
           isStaff={isStaff}
+          allMembers={allMembers}
           onBack={() => setView("list")}
           onDeleted={() => { loadEvents(); setView("list"); }}
           onUpdated={(updatedEvent) => { setSelectedEvent(updatedEvent); loadEvents(); }}

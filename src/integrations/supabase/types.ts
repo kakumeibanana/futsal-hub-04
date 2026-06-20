@@ -82,6 +82,9 @@ export type Database = {
           decide_count: number
           description: string | null
           id: string
+          is_closed: boolean
+          target_members: string[]
+          target_type: string
           title: string
         }
         Insert: {
@@ -90,6 +93,9 @@ export type Database = {
           decide_count?: number
           description?: string | null
           id?: string
+          is_closed?: boolean
+          target_members?: string[]
+          target_type?: string
           title: string
         }
         Update: {
@@ -98,6 +104,9 @@ export type Database = {
           decide_count?: number
           description?: string | null
           id?: string
+          is_closed?: boolean
+          target_members?: string[]
+          target_type?: string
           title?: string
         }
         Relationships: []
