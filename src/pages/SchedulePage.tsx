@@ -305,7 +305,7 @@ const SchedulePage = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl overflow-hidden border border-border"
+              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border flex flex-col max-h-[90vh]"
             >
               <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
                 {isStaff && (
@@ -348,7 +348,7 @@ const SchedulePage = () => {
                 </button>
               </div>
 
-              <div className="p-6 sm:p-8">
+              <div className="p-6 sm:p-8 overflow-y-auto">
                 <div className="mb-4 inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
                   {selectedEvent.type === "match" ? "試合" : selectedEvent.type === "practice" ? "練習" : "イベント"}
                 </div>
