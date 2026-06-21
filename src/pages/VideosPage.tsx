@@ -349,7 +349,14 @@ const VideosPage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.06 }}
               className="group rounded-xl overflow-hidden border border-border bg-card cursor-pointer hover:shadow-primary transition-all duration-300 relative"
-              onClick={() => setPlaying(v)}
+              onClick={() => {
+                if (v.type === "drive") {
+                  const driveId = extractDriveId(v.url);
+                  window.open(`https://drive.google.com/file/d/${driveId}/view`, "_blank", "noopener,noreferrer");
+                } else {
+                  setPlaying(v);
+                }
+              }}
             >
               <div className="relative aspect-video bg-muted">
                 <VideoThumbnail v={v} />
