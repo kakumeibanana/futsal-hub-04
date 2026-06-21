@@ -16,6 +16,14 @@ interface MatchResult {
   score_them: number;
 }
 
+interface MatchSet {
+  id: string;
+  match_id: string;
+  set_number: number;
+  score_us: number;
+  score_them: number;
+}
+
 interface MatchScorer {
   id: string;
   member_name: string;
@@ -54,6 +62,22 @@ function getResult(us: number, them: number) {
   return { label: "DRAW", bg: "bg-yellow-500/10", text: "text-yellow-500", border: "border-yellow-500/30" };
 }
 
+function getSetSummary(sets: MatchSet[]) {
+  let wins = 0, draws = 0, losses = 0;
+  for (const s of sets) {
+    if (s.score_us > s.score_them) wins++;
+    else if (s.score_us < s.score_them) losses++;
+    else draws++;
+  }
+  return { wins, draws, losses };
+}
+
+function getOverallResult(wins: number, draws: number, losses: number) {
+  if (wins > losses) return { label: "WIN", bg: "bg-green-500/10", text: "text-green-500", border: "border-green-500/30" };
+  if (wins < losses) return { label: "LOSE", bg: "bg-red-500/10", text: "text-red-500", border: "border-red-500/30" };
+  return { label: "DRAW", bg: "bg-yellow-500/10", text: "text-yellow-500", border: "border-yellow-500/30" };
+}
+
 function formatDate(dateStr: string) {
   const [y, mo, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, mo - 1, d);
@@ -78,14 +102,23 @@ function VideoPlayer({ video }: { video: VideoItem }) {
   );
 }
 
+// セット結果バッジ
+function SetResultBadge({ us, them }: { us: number; them: number }) {
+  if (us > them) return <span className="text-[10px] font-bold text-green-500">○</span>;
+  if (us < them) return <span className="text-[10px] font-bold text-red-500">●</span>;
+  return <span className="text-[10px] font-bold text-yellow-500">△</span>;
+}
+
 const MatchResultsPage = () => {
   const { isStaff, memberName } = useAuth();
 
   const [matches, setMatches] = useState<MatchResult[]>([]);
+  const [matchSetsMap, setMatchSetsMap] = useState<Record<string, MatchSet[]>>({});
   const [loading, setLoading] = useState(true);
   const [videoList, setVideoList] = useState<VideoItem[]>([]);
 
   const [selectedMatch, setSelectedMatch] = useState<MatchResult | null>(null);
+  const [detailSets, setDetailSets] = useState<MatchSet[]>([]);
   const [scorers, setScorers] = useState<MatchScorer[]>([]);
   const [comments, setComments] = useState<MatchComment[]>([]);
   const [detailVideos, setDetailVideos] = useState<VideoItem[]>([]);
@@ -103,6 +136,8 @@ const MatchResultsPage = () => {
   const [fDate, setFDate] = useState("");
   const [fScoreUs, setFScoreUs] = useState(0);
   const [fScoreThem, setFScoreThem] = useState(0);
+  const [fIsMultiSet, setFIsMultiSet] = useState(false);
+  const [fSets, setFSets] = useState<{ score_us: number; score_them: number }[]>([{ score_us: 0, score_them: 0 }]);
   const [fVideoIds, setFVideoIds] = useState<string[]>([]);
   const [fScorers, setFScorers] = useState<{ member_name: string; type: "goal" | "assist"; is_guest?: boolean }[]>([]);
   const [fScorerMember, setFScorerMember] = useState("");
@@ -117,7 +152,25 @@ const MatchResultsPage = () => {
       .from("match_results")
       .select("id, title, match_type, opponent, match_date, score_us, score_them")
       .order("match_date", { ascending: false });
-    setMatches(data ?? []);
+    const fetchedMatches = data ?? [];
+    setMatches(fetchedMatches);
+
+    // 全試合のセット情報を一括取得
+    if (fetchedMatches.length > 0) {
+      const ids = fetchedMatches.map((m) => m.id);
+      const { data: setsData } = await supabase
+        .from("match_sets")
+        .select("*")
+        .in("match_id", ids)
+        .order("set_number");
+      const map: Record<string, MatchSet[]> = {};
+      for (const s of setsData ?? []) {
+        if (!map[s.match_id]) map[s.match_id] = [];
+        map[s.match_id].push(s as MatchSet);
+      }
+      setMatchSetsMap(map);
+    }
+
     setLoading(false);
   }, []);
 
@@ -134,12 +187,14 @@ const MatchResultsPage = () => {
     setScorers([]);
     setComments([]);
     setDetailVideos([]);
+    setDetailSets([]);
     setActiveVideoIdx(0);
 
-    const [{ data: scorerData }, { data: commentData }, { data: videoLinkData }] = await Promise.all([
+    const [{ data: scorerData }, { data: commentData }, { data: videoLinkData }, { data: setsData }] = await Promise.all([
       supabase.from("match_scorers").select("*").eq("match_id", match.id).order("display_order"),
       supabase.from("match_comments").select("*").eq("match_id", match.id).order("created_at"),
       supabase.from("match_result_videos").select("video_id, display_order").eq("match_id", match.id).order("display_order"),
+      supabase.from("match_sets").select("*").eq("match_id", match.id).order("set_number"),
     ]);
 
     const commentIds = (commentData ?? []).map((c) => c.id);
@@ -148,6 +203,7 @@ const MatchResultsPage = () => {
       : { data: [] };
 
     setScorers((scorerData ?? []) as MatchScorer[]);
+    setDetailSets((setsData ?? []) as MatchSet[]);
     setComments((commentData ?? []).map((c) => ({
       ...c,
       likes: (likeData ?? []).filter((l) => l.comment_id === c.id),
@@ -219,15 +275,27 @@ const MatchResultsPage = () => {
       setFDate(match.match_date);
       setFScoreUs(match.score_us);
       setFScoreThem(match.score_them);
-      const [{ data: scorerData }, { data: videoLinkData }] = await Promise.all([
+
+      const [{ data: scorerData }, { data: videoLinkData }, { data: setsData }] = await Promise.all([
         supabase.from("match_scorers").select("*").eq("match_id", match.id).order("display_order"),
         supabase.from("match_result_videos").select("video_id, display_order").eq("match_id", match.id).order("display_order"),
+        supabase.from("match_sets").select("*").eq("match_id", match.id).order("set_number"),
       ]);
       setFScorers((scorerData ?? []).map((s) => ({ member_name: s.member_name, type: s.type as "goal" | "assist" })));
       setFVideoIds((videoLinkData ?? []).map((v) => v.video_id));
+      const sets = (setsData ?? []) as MatchSet[];
+      if (sets.length > 0) {
+        setFIsMultiSet(true);
+        setFSets(sets.map((s) => ({ score_us: s.score_us, score_them: s.score_them })));
+      } else {
+        setFIsMultiSet(false);
+        setFSets([{ score_us: 0, score_them: 0 }]);
+      }
     } else {
       setFTitle(""); setFMatchType("official"); setFOpponent(""); setFDate("");
       setFScoreUs(0); setFScoreThem(0); setFVideoIds([]); setFScorers([]);
+      setFIsMultiSet(false);
+      setFSets([{ score_us: 0, score_them: 0 }]);
     }
     const { data: memberData } = await supabase.from("members").select("name").order("name");
     const names = (memberData ?? []).map((m) => m.name);
@@ -241,14 +309,22 @@ const MatchResultsPage = () => {
     if (!fOpponent || !fDate) return;
     setFormLoading(true);
     try {
+      // マルチセット時はスコアを合計ゴール数で保存
+      let scoreUs = fScoreUs;
+      let scoreThem = fScoreThem;
+      if (fIsMultiSet) {
+        scoreUs = fSets.reduce((acc, s) => acc + s.score_us, 0);
+        scoreThem = fSets.reduce((acc, s) => acc + s.score_them, 0);
+      }
+
       let matchId: string;
       const fields = {
         title: fTitle || null,
         match_type: fMatchType,
         opponent: fOpponent,
         match_date: fDate,
-        score_us: fScoreUs,
-        score_them: fScoreThem,
+        score_us: scoreUs,
+        score_them: scoreThem,
       };
       if (editingMatch) {
         await supabase.from("match_results").update(fields).eq("id", editingMatch.id);
@@ -256,10 +332,16 @@ const MatchResultsPage = () => {
         await Promise.all([
           supabase.from("match_scorers").delete().eq("match_id", matchId),
           supabase.from("match_result_videos").delete().eq("match_id", matchId),
+          supabase.from("match_sets").delete().eq("match_id", matchId),
         ]);
       } else {
         const { data } = await supabase.from("match_results").insert({ ...fields, created_by: memberName }).select().single();
         matchId = data!.id;
+      }
+      if (fIsMultiSet && fSets.length > 0) {
+        await supabase.from("match_sets").insert(
+          fSets.map((s, i) => ({ match_id: matchId, set_number: i + 1, score_us: s.score_us, score_them: s.score_them }))
+        );
       }
       if (fScorers.length > 0) {
         await supabase.from("match_scorers").insert(
@@ -304,7 +386,12 @@ const MatchResultsPage = () => {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {matches.map((match, i) => {
-            const result = getResult(match.score_us, match.score_them);
+            const sets = matchSetsMap[match.id] ?? [];
+            const isMulti = sets.length > 0;
+            const summary = isMulti ? getSetSummary(sets) : null;
+            const result = isMulti
+              ? getOverallResult(summary!.wins, summary!.draws, summary!.losses)
+              : getResult(match.score_us, match.score_them);
             return (
               <motion.div
                 key={match.id}
@@ -329,11 +416,27 @@ const MatchResultsPage = () => {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">vs {match.opponent}</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-black text-foreground">{match.score_us}</span>
-                  <span className="text-xl text-muted-foreground font-light">-</span>
-                  <span className="text-4xl font-black text-foreground">{match.score_them}</span>
-                </div>
+                {isMulti ? (
+                  <div>
+                    <div className="flex items-baseline gap-1 mb-1">
+                      <span className="text-3xl font-black text-green-500">{summary!.wins}</span>
+                      <span className="text-lg text-muted-foreground font-light">勝</span>
+                      {summary!.draws > 0 && <>
+                        <span className="text-3xl font-black text-yellow-500">{summary!.draws}</span>
+                        <span className="text-lg text-muted-foreground font-light">分</span>
+                      </>}
+                      <span className="text-3xl font-black text-red-500">{summary!.losses}</span>
+                      <span className="text-lg text-muted-foreground font-light">敗</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{sets.length}セット戦</p>
+                  </div>
+                ) : (
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-black text-foreground">{match.score_us}</span>
+                    <span className="text-xl text-muted-foreground font-light">-</span>
+                    <span className="text-4xl font-black text-foreground">{match.score_them}</span>
+                  </div>
+                )}
                 {match.title && <p className="text-xs text-muted-foreground mt-2">{match.title}</p>}
               </motion.div>
             );
@@ -350,7 +453,7 @@ const MatchResultsPage = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto overflow-x-hidden max-h-[90vh]"
+              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border flex flex-col max-h-[90vh]"
             >
               <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
                 {isStaff && (
@@ -362,7 +465,7 @@ const MatchResultsPage = () => {
                 <button onClick={() => setSelectedMatch(null)} className="p-2 bg-muted/50 hover:bg-muted text-muted-foreground rounded-full transition-colors"><X size={20} /></button>
               </div>
 
-              <div className="p-6 sm:p-8">
+              <div className="p-6 sm:p-8 overflow-y-auto">
                 {detailLoading ? (
                   <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-primary" /></div>
                 ) : (
@@ -381,16 +484,73 @@ const MatchResultsPage = () => {
                       </div>
                       <div className="flex items-center gap-3 mb-1">
                         <span className="text-sm text-muted-foreground">{formatDate(selectedMatch.match_date)}</span>
-                        {(() => { const r = getResult(selectedMatch.score_us, selectedMatch.score_them); return <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${r.bg} ${r.text} ${r.border}`}>{r.label}</span>; })()}
+                        {(() => {
+                          const sets = detailSets;
+                          const isMulti = sets.length > 0;
+                          if (isMulti) {
+                            const { wins, draws, losses } = getSetSummary(sets);
+                            const r = getOverallResult(wins, draws, losses);
+                            return <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${r.bg} ${r.text} ${r.border}`}>{r.label}</span>;
+                          }
+                          const r = getResult(selectedMatch.score_us, selectedMatch.score_them);
+                          return <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${r.bg} ${r.text} ${r.border}`}>{r.label}</span>;
+                        })()}
                       </div>
                       <p className="text-xl font-bold text-foreground">vs {selectedMatch.opponent}</p>
                     </div>
 
-                    <div className="flex items-baseline gap-3 mb-4">
-                      <span className="text-5xl sm:text-7xl font-black text-foreground">{selectedMatch.score_us}</span>
-                      <span className="text-2xl sm:text-3xl text-muted-foreground font-light">-</span>
-                      <span className="text-5xl sm:text-7xl font-black text-foreground">{selectedMatch.score_them}</span>
-                    </div>
+                    {/* スコア表示 */}
+                    {detailSets.length > 0 ? (
+                      <div className="mb-4">
+                        {/* 合計サマリー */}
+                        {(() => {
+                          const { wins, draws, losses } = getSetSummary(detailSets);
+                          return (
+                            <div className="flex items-baseline gap-1 mb-3">
+                              <span className="text-5xl font-black text-green-500">{wins}</span>
+                              <span className="text-2xl text-muted-foreground font-light">勝</span>
+                              {draws > 0 && <>
+                                <span className="text-5xl font-black text-yellow-500">{draws}</span>
+                                <span className="text-2xl text-muted-foreground font-light">分</span>
+                              </>}
+                              <span className="text-5xl font-black text-red-500">{losses}</span>
+                              <span className="text-2xl text-muted-foreground font-light">敗</span>
+                            </div>
+                          );
+                        })()}
+                        {/* セットごとの詳細テーブル */}
+                        <div className="bg-muted/30 rounded-xl overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border">
+                                <th className="text-left px-3 py-2 text-xs text-muted-foreground font-medium">セット</th>
+                                <th className="text-center px-3 py-2 text-xs text-muted-foreground font-medium">結果</th>
+                                <th className="text-center px-3 py-2 text-xs text-muted-foreground font-medium">スコア</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {detailSets.map((s) => (
+                                <tr key={s.id} className="border-b border-border last:border-0">
+                                  <td className="px-3 py-2 text-muted-foreground">第{s.set_number}戦</td>
+                                  <td className="px-3 py-2 text-center">
+                                    <SetResultBadge us={s.score_us} them={s.score_them} />
+                                  </td>
+                                  <td className="px-3 py-2 text-center font-bold text-foreground">
+                                    {s.score_us} - {s.score_them}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline gap-3 mb-4">
+                        <span className="text-5xl sm:text-7xl font-black text-foreground">{selectedMatch.score_us}</span>
+                        <span className="text-2xl sm:text-3xl text-muted-foreground font-light">-</span>
+                        <span className="text-5xl sm:text-7xl font-black text-foreground">{selectedMatch.score_them}</span>
+                      </div>
+                    )}
 
                     {scorers.length > 0 && (
                       <div className="mb-4 bg-muted/30 rounded-xl p-3 space-y-1">
@@ -479,10 +639,10 @@ const MatchResultsPage = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border overflow-y-auto overflow-x-hidden max-h-[90vh]"
+              className="relative w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border flex flex-col max-h-[90vh]"
             >
               <button onClick={() => setShowForm(false)} className="absolute top-4 right-4 p-2 bg-muted/50 hover:bg-muted rounded-full text-muted-foreground z-10"><X size={20} /></button>
-              <div className="p-6 sm:p-8">
+              <div className="p-6 sm:p-8 overflow-y-auto">
                 <h2 className="text-xl font-bold text-foreground mb-6">{editingMatch ? "試合結果を編集" : "試合結果を追加"}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
@@ -516,16 +676,82 @@ const MatchResultsPage = () => {
                     <label className="text-sm font-medium text-foreground mb-1 block">日付 *</label>
                     <input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} required className={inputClass} />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-sm font-medium text-foreground mb-1 block">自チーム</label>
-                      <input type="number" min={0} value={fScoreUs} onChange={(e) => setFScoreUs(Number(e.target.value))} className={inputClass} />
+
+                  {/* シングル / マルチセット切り替え */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">スコア形式</label>
+                    <div className="flex rounded-lg border border-border overflow-hidden w-fit mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setFIsMultiSet(false)}
+                        className={`px-3 py-2 text-xs font-semibold transition-colors ${!fIsMultiSet ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                      >
+                        1試合
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFIsMultiSet(true)}
+                        className={`px-3 py-2 text-xs font-semibold transition-colors ${fIsMultiSet ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                      >
+                        複数セット戦
+                      </button>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-foreground mb-1 block">相手チーム</label>
-                      <input type="number" min={0} value={fScoreThem} onChange={(e) => setFScoreThem(Number(e.target.value))} className={inputClass} />
-                    </div>
+
+                    {!fIsMultiSet ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-sm font-medium text-foreground mb-1 block">自チーム</label>
+                          <input type="number" min={0} value={fScoreUs} onChange={(e) => setFScoreUs(Number(e.target.value))} className={inputClass} />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-foreground mb-1 block">相手チーム</label>
+                          <input type="number" min={0} value={fScoreThem} onChange={(e) => setFScoreThem(Number(e.target.value))} className={inputClass} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-[3rem_1fr_1.5rem_1fr_2rem] gap-1 items-center px-1">
+                          <span className="text-xs text-muted-foreground text-center"></span>
+                          <span className="text-xs text-muted-foreground text-center">自チーム</span>
+                          <span></span>
+                          <span className="text-xs text-muted-foreground text-center">相手</span>
+                          <span></span>
+                        </div>
+                        {fSets.map((s, i) => (
+                          <div key={i} className="grid grid-cols-[3rem_1fr_1.5rem_1fr_2rem] gap-1 items-center">
+                            <span className="text-xs text-muted-foreground text-center">第{i + 1}戦</span>
+                            <input
+                              type="number" min={0} value={s.score_us}
+                              onChange={(e) => setFSets((prev) => prev.map((x, j) => j === i ? { ...x, score_us: Number(e.target.value) } : x))}
+                              className={inputClass}
+                            />
+                            <span className="text-center text-muted-foreground text-sm">-</span>
+                            <input
+                              type="number" min={0} value={s.score_them}
+                              onChange={(e) => setFSets((prev) => prev.map((x, j) => j === i ? { ...x, score_them: Number(e.target.value) } : x))}
+                              className={inputClass}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setFSets((prev) => prev.filter((_, j) => j !== i))}
+                              className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                              disabled={fSets.length <= 1}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setFSets((prev) => [...prev, { score_us: 0, score_them: 0 }])}
+                          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors font-semibold mt-1"
+                        >
+                          <Plus size={12} /> セットを追加
+                        </button>
+                      </div>
+                    )}
                   </div>
+
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1 block">動画</label>
                     <select
