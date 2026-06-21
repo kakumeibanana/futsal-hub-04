@@ -701,11 +701,11 @@ const MatchResultsPage = () => {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-sm font-medium text-foreground mb-1 block">自チーム</label>
-                          <input type="number" min={0} value={fScoreUs} onChange={(e) => setFScoreUs(Number(e.target.value))} className={inputClass} />
+                          <input type="number" min={0} value={fScoreUs} onChange={(e) => setFScoreUs(Number(e.target.value))} onFocus={(e) => e.target.select()} className={inputClass} />
                         </div>
                         <div>
                           <label className="text-sm font-medium text-foreground mb-1 block">相手チーム</label>
-                          <input type="number" min={0} value={fScoreThem} onChange={(e) => setFScoreThem(Number(e.target.value))} className={inputClass} />
+                          <input type="number" min={0} value={fScoreThem} onChange={(e) => setFScoreThem(Number(e.target.value))} onFocus={(e) => e.target.select()} className={inputClass} />
                         </div>
                       </div>
                     ) : (
@@ -723,12 +723,14 @@ const MatchResultsPage = () => {
                             <input
                               type="number" min={0} value={s.score_us}
                               onChange={(e) => setFSets((prev) => prev.map((x, j) => j === i ? { ...x, score_us: Number(e.target.value) } : x))}
+                              onFocus={(e) => e.target.select()}
                               className={inputClass}
                             />
                             <span className="text-center text-muted-foreground text-sm">-</span>
                             <input
                               type="number" min={0} value={s.score_them}
                               onChange={(e) => setFSets((prev) => prev.map((x, j) => j === i ? { ...x, score_them: Number(e.target.value) } : x))}
+                              onFocus={(e) => e.target.select()}
                               className={inputClass}
                             />
                             <button
