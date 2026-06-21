@@ -87,13 +87,36 @@ function formatDate(dateStr: string) {
 function VideoPlayer({ video }: { video: VideoItem }) {
   const ytId = video.type === "youtube" ? extractYoutubeId(video.url) : null;
   const driveId = video.type === "drive" ? extractDriveId(video.url) : null;
+
+  if (driveId) {
+    return (
+      <a
+        href={`https://drive.google.com/file/d/${driveId}/view`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-4 p-4 rounded-xl border border-border bg-muted/30 hover:bg-muted/60 transition-colors mb-4 group"
+      >
+        <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+          <svg className="w-6 h-6 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.366-.254-.586-.704-.586zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396.006-.83-.479-1.268-1.255-1.268z"/>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8.073 17.64c-.367 0-.756-.047-1.001-.106v-3.44c.245-.053.653-.083 1.043-.083 1.056 0 1.724.568 1.724 1.706-.006 1.29-.739 1.923-1.766 1.923zm3.81-.018c-.487 0-.946-.117-1.184-.23l.148-.964c.254.124.671.254 1.067.254.426 0 .65-.172.65-.444 0-.255-.189-.402-.68-.58-.681-.242-1.126-.626-1.126-1.232 0-.713.586-1.256 1.564-1.256.474 0 .822.1 1.067.213l-.207.934c-.177-.083-.474-.201-.873-.201-.397 0-.598.172-.598.39 0 .266.219.386.75.592.755.272 1.072.668 1.072 1.238-.006.707-.533 1.286-1.65 1.286zm4.285-3.501h-1.13v.875h1.06v.922h-1.06v1.685h-1.101v-4.404h2.231v.922z"/>
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate">{video.title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">タップして Google Drive で開く</p>
+        </div>
+        <svg className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+      </a>
+    );
+  }
+
   return (
     <div className="rounded-xl overflow-hidden aspect-video mb-4">
       {ytId && (
         <iframe src={`https://www.youtube.com/embed/${ytId}`} className="w-full h-full" allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" />
-      )}
-      {driveId && (
-        <iframe src={`https://drive.google.com/file/d/${driveId}/preview`} className="w-full h-full" allowFullScreen />
       )}
       {video.type === "upload" && (
         <video src={video.url} className="w-full h-full bg-black" controls />
