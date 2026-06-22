@@ -937,8 +937,12 @@ const EventDetail = ({
   });
 
   const decideCount = currentEvent.decide_count ?? 1;
-  const uniqueScores = [...new Set(dateScores.map((d) => d.score))].filter((s) => s > 0).sort((a, b) => b - a);
-  const topNThreshold = uniqueScores.length >= decideCount ? uniqueScores[decideCount - 1] : 0;
+  // スコアが1点以上ある日を高い順に並べ、上位N日（=decideCount）を割り出す。
+  // N位と同点の日もすべて含める。候補日がN個未満なら、点のある日すべてが対象。
+  const positiveScores = dateScores.map((d) => d.score).filter((s) => s > 0).sort((a, b) => b - a);
+  const topNThreshold = positiveScores.length === 0
+    ? Infinity
+    : positiveScores[Math.min(decideCount, positiveScores.length) - 1];
   const topDateKeys = new Set(
     dateScores.filter((d) => d.score > 0 && d.score >= topNThreshold).map((d) => `${d.date}_${d.time_slot ?? ""}`)
   );
