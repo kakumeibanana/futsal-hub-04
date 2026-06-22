@@ -270,7 +270,7 @@ const EventList = ({
 );
 
 // ── イベント作成 ──────────────────────────────────────────
-const TIME_SLOTS = ["午前", "午後", "夜", "終日"];
+const TIME_SLOTS = ["午前", "午後", "夜", "A時間帯", "B時間帯", "終日"];
 
 const CreateEvent = ({
   memberName, allMembers, onCreated, onCancel,
