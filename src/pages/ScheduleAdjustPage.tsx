@@ -866,15 +866,18 @@ const EventDetail = ({
       .eq("event_id", event.id).eq("member_name", memberName);
     const existingIds = (existingData ?? []).map((r: any) => r.id);
 
+    // 先に自分の既存回答を削除してから挿入する。
+    // (event_id, member_name, date, time_slot) にユニーク制約があるため、
+    // 削除より先に挿入すると再投票（変更）時に必ず重複エラーになる。
+    if (existingIds.length > 0) {
+      await supabase.from("responses").delete().in("id", existingIds);
+    }
+
     const { error: insertError } = await supabase.from("responses").insert(insertRows);
     if (insertError) {
       toast({ title: "送信に失敗しました", description: insertError.message, variant: "destructive" });
       setUpdatingResponse(false);
       return;
-    }
-
-    if (existingIds.length > 0) {
-      await supabase.from("responses").delete().in("id", existingIds);
     }
 
     const { data: responsesData } = await supabase
