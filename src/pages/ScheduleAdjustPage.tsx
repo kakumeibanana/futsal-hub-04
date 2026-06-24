@@ -291,7 +291,7 @@ const CreateEvent = ({
   const [submitting, setSubmitting] = useState(false);
 
   const dateOptions: string[] = [];
-  for (let i = 0; i < 90; i++) {
+  for (let i = -30; i < 90; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
     dateOptions.push(d.toISOString().split("T")[0]);
@@ -504,7 +504,7 @@ const EditEvent = ({
   const [submitting, setSubmitting] = useState(false);
 
   const futureOptions: string[] = [];
-  for (let i = 0; i < 90; i++) {
+  for (let i = -30; i < 90; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
     futureOptions.push(d.toISOString().split("T")[0]);
@@ -931,7 +931,12 @@ const EventDetail = ({
     onDeleted();
   };
 
-  const memberNames = [...new Set(responses.map((r) => r.member_name))];
+  // 集計表には「対象メンバー全員」＋「投票済みの人」を表示する。
+  // 対象なのに未投票の人も行に出すことで、誰が未提出か一目で分かる（セルは「-」表示）。
+  const targetNames = allMembers
+    .filter((m) => checkIsTarget(currentEvent, m.name, m.grade))
+    .map((m) => m.name);
+  const memberNames = [...new Set([...targetNames, ...responses.map((r) => r.member_name)])];
   const dateScores = dates.map((d) => {
     const score = responses
       .filter((r) => r.date === d.date && r.time_slot === d.time_slot)
