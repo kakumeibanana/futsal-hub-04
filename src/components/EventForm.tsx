@@ -73,7 +73,11 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
         if (data) {
           setLineNotify((data.line_notify_type as "none" | "immediate" | "scheduled") ?? "none");
           if (data.line_send_at) {
-            setLineSendAt(new Date(data.line_send_at).toISOString().slice(0, 16));
+            // DBにはUTCで保存されているので、datetime-local用にローカル時刻へ変換する。
+            // （変換しないと日本時間20:00が11:00と表示されてしまう）
+            const d = new Date(data.line_send_at);
+            const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+            setLineSendAt(local.toISOString().slice(0, 16));
           }
         }
       });
