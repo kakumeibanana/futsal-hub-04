@@ -184,7 +184,7 @@ const EventForm = ({ onClose, onSaved, initialValues, eventId }: EventFormProps)
   };
 
   const inputClass =
-    "w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50";
+    "w-full min-w-0 max-w-full box-border px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50";
 
   const practiceTemplates = templates.filter((t) => t.type === "practice");
   const matchTemplates = templates.filter((t) => t.type === "match");
