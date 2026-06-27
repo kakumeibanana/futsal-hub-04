@@ -24,6 +24,9 @@ input[type="datetime-local"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
+  /* appearance:none で未入力時に高さが潰れるのを防ぎ、テキスト入力欄と高さを揃える */
+  min-height: 2.375rem;
+  line-height: 1.25rem;
 }
 
 input[type="date"]::-webkit-date-and-time-value,
