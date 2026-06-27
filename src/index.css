@@ -5,6 +5,17 @@
 @tailwind utilities;
 
 @layer base {
+  /* スマホでネイティブ入力欄(date/time/datetime-local/textarea等)が
+     親コンテナをはみ出すのを防ぐ。min-width:0 が効かないと固有幅で膨らむ。 */
+  input,
+  textarea,
+  select {
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+@layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 260 10% 12%;
