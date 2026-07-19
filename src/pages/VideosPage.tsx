@@ -34,6 +34,7 @@ const TAB_STYLES = (active: boolean) =>
 
 // ---- サムネイル ----
 function VideoThumbnail({ v }: { v: VideoItem }) {
+  const [imgError, setImgError] = useState(false);
   const ytId = v.type === "youtube" ? extractYoutubeId(v.url) : null;
   const driveId = v.type === "drive" ? extractDriveId(v.url) : null;
 
@@ -41,7 +42,24 @@ function VideoThumbnail({ v }: { v: VideoItem }) {
     return <img src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`} alt="thumbnail" className="w-full h-full object-cover" loading="lazy" />;
   }
   if (driveId) {
-    return <img src={`https://drive.google.com/thumbnail?id=${driveId}&sz=w640`} alt="thumbnail" className="w-full h-full object-cover" loading="lazy" />;
+    // Driveのサムネは共有設定や生成状況で取得できないことがある。
+    // 失敗時は壊れた画像でなく、動画プレースホルダーを表示する。
+    if (imgError) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-muted">
+          <Play size={28} className="text-muted-foreground" />
+        </div>
+      );
+    }
+    return (
+      <img
+        src={`https://drive.google.com/thumbnail?id=${driveId}&sz=w640`}
+        alt="thumbnail"
+        className="w-full h-full object-cover"
+        loading="lazy"
+        onError={() => setImgError(true)}
+      />
+    );
   }
   return <video src={v.url} className="w-full h-full object-cover" preload="metadata" />;
 }
