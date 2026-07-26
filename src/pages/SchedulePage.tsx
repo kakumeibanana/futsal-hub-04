@@ -6,7 +6,7 @@ import EventForm from "@/components/EventForm";
 import TemplateManager from "@/components/TemplateManager";
 import {
   CalendarDays, Loader2, AlertCircle,
-  X, MapPin, Clock, Info, Briefcase, Plus, Edit2, Trash2, Bell, BellOff, FileText,
+  X, MapPin, Clock, Info, Briefcase, Plus, Edit2, Trash2, Bell, BellOff, FileText, MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,6 +43,28 @@ const filterOptions: { value: EventType | "all"; label: string }[] = [
   { value: "event", label: "イベント" },
 ];
 
+// LINEに実際に送信されるメッセージを再現する。
+// （edge function `line-notify` の buildMessage と同じロジックに合わせること）
+const buildLineMessage = (event: MappedEvent): string => {
+  const [year, month, day] = event.date.split("-").map(Number);
+  const d = new Date(year, month - 1, day);
+  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+  const dateStr = `${month}/${day}(${dayNames[d.getDay()]})`;
+
+  let header = "【お知らせ】";
+  if (event.type === "match") header = "【MATCH DAY】";
+  else if (event.type === "practice") header = "【TRAINING】";
+  else if (event.type === "event") header = "//EVENT//";
+
+  const location = event.location || "未定";
+  const detail = event.detail || "特になし";
+  const belongings = event.belongings || "特になし";
+  const timeStr = event.time && event.time !== "終日" ? `\n${event.time}` : "";
+  const titleLine = event.type !== "practice" ? `\n\n★${event.title}` : "";
+
+  return `${header}\n${dateStr}${timeStr}\n@${location}${titleLine}\n\n★詳細・時程\n${detail}\n\n★持ち物\n${belongings}`;
+};
+
 const SchedulePage = () => {
   const { isStaff, role } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -57,6 +79,8 @@ const SchedulePage = () => {
   const [duplicateValues, setDuplicateValues] = useState<MappedEvent | null>(null);
   const [editingEvent, setEditingEvent] = useState<MappedEvent | null>(null);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [showLineOutput, setShowLineOutput] = useState(false);
+  const [copiedOutput, setCopiedOutput] = useState(false);
   const [notificationTemplate, setNotificationTemplate] = useState<{
     title: string; date: string; startTime: string; endTime: string;
     type: "practice"; location: string; belongings: string;
@@ -107,6 +131,12 @@ const SchedulePage = () => {
   useEffect(() => {
     fetchSchedules();
   }, [fetchSchedules]);
+
+  // 別のイベントを開いたら出力プレビューを閉じる
+  useEffect(() => {
+    setShowLineOutput(false);
+    setCopiedOutput(false);
+  }, [selectedEvent]);
 
   // 通知クリックからのディープリンク処理
   useEffect(() => {
@@ -187,14 +217,16 @@ const SchedulePage = () => {
                 <span className="hidden sm:inline">{isSubscribed ? "通知ON" : "通知OFF"}</span>
               </button>
             )}
-            <button
-              onClick={() => setShowTemplateManager(true)}
-              title="テンプレートを管理"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted text-muted-foreground text-xs sm:text-sm font-semibold hover:bg-secondary transition-colors flex-shrink-0 border border-border"
-            >
-              <FileText size={14} />
-              <span className="hidden sm:inline">テンプレート</span>
-            </button>
+            {role === "captain" && (
+              <button
+                onClick={() => setShowTemplateManager(true)}
+                title="テンプレートを管理"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted text-muted-foreground text-xs sm:text-sm font-semibold hover:bg-secondary transition-colors flex-shrink-0 border border-border"
+              >
+                <FileText size={14} />
+                <span className="hidden sm:inline">テンプレート</span>
+              </button>
+            )}
             <button
               onClick={() => setShowForm(true)}
               className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors flex-shrink-0"
@@ -392,6 +424,39 @@ const SchedulePage = () => {
                     <p className="text-sm text-muted-foreground italic text-center py-4">
                       詳細情報は登録されていません。
                     </p>
+                  )}
+
+                  {/* 出力結果（主将のみ）: LINEに実際に送られるメッセージを確認できる */}
+                  {role === "captain" && (
+                    <div className="pt-2">
+                      <button
+                        onClick={() => setShowLineOutput((v) => !v)}
+                        className="flex items-center gap-2 text-sm font-semibold text-green-600 hover:text-green-700 transition-colors"
+                      >
+                        <MessageSquare size={16} />
+                        {showLineOutput ? "出力結果を隠す" : "出力結果（LINE送信内容）を見る"}
+                      </button>
+                      {showLineOutput && (
+                        <div className="mt-3 bg-muted/50 rounded-xl p-4 border border-border">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs text-muted-foreground">LINEに送信されるメッセージ</p>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(buildLineMessage(selectedEvent));
+                                setCopiedOutput(true);
+                                setTimeout(() => setCopiedOutput(false), 2000);
+                              }}
+                              className="text-xs font-semibold text-primary hover:underline"
+                            >
+                              {copiedOutput ? "コピーしました" : "コピー"}
+                            </button>
+                          </div>
+                          <pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed">
+                            {buildLineMessage(selectedEvent)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
