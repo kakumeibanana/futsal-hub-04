@@ -19,6 +19,7 @@ import GalleryPage from "./pages/GalleryPage";
 import NotFound from "./pages/NotFound";
 import MembersPage from "./pages/MembersPage";
 import MatchResultsPage from "./pages/MatchResultsPage";
+import ScorerRankingPage from "./pages/ScorerRankingPage";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/gallery" element={<ProtectedRoute><GalleryPage /></ProtectedRoute>} />
               <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
               <Route path="/match-results" element={<ProtectedRoute><MatchResultsPage /></ProtectedRoute>} />
+              <Route path="/scorers" element={<ProtectedRoute><ScorerRankingPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
