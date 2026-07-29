@@ -12,7 +12,7 @@ const memberLinks = [
   { to: "/schedule", label: "日程" },
   { to: "/adjust", label: "日程調整" },
   { to: "/match-results", label: "試合結果" },
-  { to: "/scorers", label: "得点ランキング" },
+  { to: "/scorers", label: "ランキング" },
   { to: "/members", label: "メンバー" },
   { to: "/news", label: "お知らせ" },
   { to: "/videos", label: "動画" },
@@ -26,7 +26,7 @@ const SiteHeader = () => {
   const { isLoggedIn, memberName, logout } = useAuth();
 
   const linkClass = (to: string) =>
-    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+    `px-2.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
       location.pathname === to
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -47,7 +47,7 @@ const SiteHeader = () => {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden xl:flex items-center gap-1 flex-nowrap">
           <Link to="/" className={linkClass("/")}>ホーム</Link>
           {isLoggedIn && (
             <>
@@ -78,7 +78,7 @@ const SiteHeader = () => {
 
         {/* Mobile toggle */}
         <button
-          className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors"
+          className="xl:hidden p-2 rounded-lg hover:bg-muted transition-colors"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="メニュー"
         >
@@ -94,7 +94,7 @@ const SiteHeader = () => {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="md:hidden overflow-hidden border-t border-border bg-background"
+            className="xl:hidden overflow-hidden border-t border-border bg-background"
           >
             <div className="container py-3 flex flex-col gap-1">
               <Link to="/" onClick={() => setMobileOpen(false)} className={linkClass("/")}>
