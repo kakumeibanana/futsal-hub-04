@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { Trophy, Plus, Edit2, Trash2, X, Send, Heart, Loader2 } from "lucide-react";
+import { Trophy, Plus, Edit2, Trash2, X, Send, Heart, Loader2, Layers } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import TournamentForm from "@/components/TournamentForm";
+import { OWN_GOAL_NAME, normalizeScore } from "@/lib/matchUtils";
 
 const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
-
-// 相手のオウンゴールは得点者名としてこの固定値で保存する
-const OWN_GOAL_NAME = "オウンゴール";
 
 interface MatchResult {
   id: string;
@@ -58,14 +57,6 @@ function extractYoutubeId(url: string): string | null {
 function extractDriveId(url: string): string | null {
   const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   return m ? m[1] : null;
-}
-
-// スコア入力の正規化: 数字以外を除去し、"01" のような先頭ゼロを解消する。
-// 空文字は許容し（全消しできるように）、保存時に0として扱う。
-function normalizeScore(v: string): string {
-  const digits = v.replace(/[^0-9]/g, "");
-  if (digits === "") return "";
-  return String(Number(digits));
 }
 
 function getResult(us: number, them: number) {
@@ -163,6 +154,7 @@ const MatchResultsPage = () => {
   const [commentLoading, setCommentLoading] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
+  const [showTournamentForm, setShowTournamentForm] = useState(false);
   const [editingMatch, setEditingMatch] = useState<MatchResult | null>(null);
   const [members, setMembers] = useState<string[]>([]);
   const [fTitle, setFTitle] = useState("");
@@ -422,11 +414,22 @@ const MatchResultsPage = () => {
           試合結果
         </h1>
         {isStaff && (
-          <button onClick={() => openForm(null)} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors">
-            <Plus size={14} />
-            <span className="hidden sm:inline">結果を追加</span>
-            <span className="sm:hidden">追加</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTournamentForm(true)}
+              title="大会をまとめて追加"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted text-muted-foreground text-xs sm:text-sm font-semibold hover:bg-secondary transition-colors border border-border flex-shrink-0"
+            >
+              <Layers size={14} />
+              <span className="hidden sm:inline">大会をまとめて追加</span>
+              <span className="sm:hidden">大会</span>
+            </button>
+            <button onClick={() => openForm(null)} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors flex-shrink-0">
+              <Plus size={14} />
+              <span className="hidden sm:inline">結果を追加</span>
+              <span className="sm:hidden">追加</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -969,6 +972,19 @@ const MatchResultsPage = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* 大会まとめて追加フォーム
+          AnimatePresence で包むと閉じても unmount されない事象があったため、
+          意図的に素の条件レンダリングにしている（開くアニメーションは中の motion が担当）。 */}
+      {showTournamentForm && (
+        <TournamentForm
+          onClose={() => setShowTournamentForm(false)}
+          onSaved={() => {
+            setShowTournamentForm(false);
+            fetchMatches();
+          }}
+        />
+      )}
     </div>
   );
 };
