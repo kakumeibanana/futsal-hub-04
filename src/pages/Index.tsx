@@ -101,7 +101,9 @@ const Index = () => {
         supabase
           .from("match_results")
           .select("id, title, opponent, match_date, score_us, score_them")
+          // 同じ日は登録順＝試合順に並べる（試合結果ページと揃える）
           .order("match_date", { ascending: false })
+          .order("created_at", { ascending: true })
           .limit(3),
       ]);
       setTodayEvents(mapRows(todayData ?? []));

@@ -201,7 +201,9 @@ const MatchResultsPage = () => {
     const { data } = await supabase
       .from("match_results")
       .select("id, title, match_type, opponent, match_date, score_us, score_them")
-      .order("match_date", { ascending: false });
+      // 同じ日は登録順＝試合順（第1試合→第2試合…）に並べる
+      .order("match_date", { ascending: false })
+      .order("created_at", { ascending: true });
     const fetchedMatches = data ?? [];
     setMatches(fetchedMatches);
 
