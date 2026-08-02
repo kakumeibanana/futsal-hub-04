@@ -316,7 +316,12 @@ const VideosPage = () => {
   const [playing, setPlaying] = useState<VideoItem | null>(null);
 
   const fetchVideos = async () => {
-    const { data } = await supabase.from("videos").select("*").order("date", { ascending: false });
+    // 新しい順。同じ日の中も登録順の逆にして、n が小さいもの（1試合目・1個目）ほど下＝古い扱いにする
+    const { data } = await supabase
+      .from("videos")
+      .select("*")
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false });
     setVideos((data ?? []) as VideoItem[]);
     setLoading(false);
   };

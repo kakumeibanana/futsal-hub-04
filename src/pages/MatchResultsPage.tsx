@@ -228,7 +228,7 @@ const MatchResultsPage = () => {
 
   useEffect(() => {
     fetchMatches();
-    supabase.from("videos").select("id, title, type, url").order("date", { ascending: false }).then(({ data }) => {
+    supabase.from("videos").select("id, title, type, url").order("date", { ascending: false }).order("created_at", { ascending: false }).then(({ data }) => {
       setVideoList((data ?? []) as VideoItem[]);
     });
   }, [fetchMatches]);
