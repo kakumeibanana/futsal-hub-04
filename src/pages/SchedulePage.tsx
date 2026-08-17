@@ -91,12 +91,11 @@ const SchedulePage = () => {
     setLoading(true);
     setError(null);
     try {
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      // 過去の予定もカレンダーから辿れるよう、期間を絞らず全件取得する。
+      // （一覧の既定表示は今日以降のみ。日付を選んだときだけ過去も出す）
       const { data, error: fetchError } = await supabase
         .from("schedule_events")
         .select("id, title, date, start_time, end_time, is_all_day, location, type, detail, belongings")
-        .gte("date", today)
         .order("date", { ascending: true });
 
       if (fetchError) throw fetchError;
@@ -168,6 +167,9 @@ const SchedulePage = () => {
     setSearchParams({}, { replace: true });
   }, []);
 
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
   const filtered = events.filter((e) => {
     if (filter !== "all" && e.type !== filter) return false;
     if (selectedDate) {
@@ -175,9 +177,14 @@ const SchedulePage = () => {
       const selMonth = String(selectedDate.getMonth() + 1).padStart(2, "0");
       const selDay = String(selectedDate.getDate()).padStart(2, "0");
       if (e.date !== `${selYear}-${selMonth}-${selDay}`) return false;
+    } else if (e.date < todayStr) {
+      // 日付を選んでいないときは、これからの予定だけを並べる
+      return false;
     }
     return true;
   });
+
+  const isPastSelection = !!selectedDate && filtered.length > 0 && filtered[0].date < todayStr;
 
   const handleDeleteEvent = async (event: MappedEvent) => {
     if (!confirm(`「${event.title}」を削除しますか？`)) return;
@@ -294,6 +301,13 @@ const SchedulePage = () => {
             <div className="bg-destructive/10 text-destructive p-4 rounded-xl flex items-start gap-3 border border-destructive/20">
               <AlertCircle size={20} className="shrink-0 mt-0.5" />
               <p className="text-sm">{error}</p>
+            </div>
+          )}
+
+          {!loading && !error && isPastSelection && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 border border-border text-xs text-muted-foreground">
+              <Clock size={13} className="shrink-0" />
+              過去の予定を表示しています
             </div>
           )}
 
