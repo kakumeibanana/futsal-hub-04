@@ -6,7 +6,7 @@ export type Court = "full" | "half";
 
 export const VBS = {
   full: { x: -1.6, y: -2.2, w: 23.2, h: 44.4 },
-  half: { x: -1.6, y: -2.2, w: 23.2, h: 28 },
+  half: { x: -1.6, y: -2.2, w: 23.2, h: 23.8 },
 } as const;
 
 // コマの実寸半径。半面は盤が大きく映るので、全面版と画面上の大きさが揃うよう小さくする
@@ -15,7 +15,8 @@ export const RADII = {
   half: { player: 0.7, ball: 0.45 },
 } as const;
 export const SEG_MS = 900; // コマ間の再生時間（作戦盤と同じ）
-export const HOLD_MS = 1600; // 最後のコマで止めてから頭に戻るまで
+export const HOLD_MS = 1600; // 最後のコマで止めてから頭に戻るまで（再生時間の単位。速度に応じて伸び縮みする）
+export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75] as const;
 
 export interface Piece {
   t: "a" | "b" | "ball";
