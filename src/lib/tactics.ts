@@ -38,6 +38,7 @@ export interface Tactic {
   note?: string;
   roster: { a: number; b: number };
   names: { a: string[]; b: string[] };
+  nameScale: number; // 名前の文字の大きさの倍率（作戦盤で調整した値）
   pieces: Piece[];
   frames: { x: number; y: number }[][];
 }
@@ -87,6 +88,7 @@ export const parseTactic = (id: string, raw: any): Tactic | null => {
     note: typeof raw.note === "string" ? raw.note : undefined,
     roster: { a, b },
     names: parseNames(raw.names),
+    nameScale: isNum(raw.nameScale) ? Math.round(clamp(raw.nameScale, 0.5, 1.5) * 10) / 10 : 1,
     pieces,
     frames,
   };
