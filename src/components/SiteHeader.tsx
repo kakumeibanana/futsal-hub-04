@@ -13,6 +13,7 @@ const memberLinks = [
   { to: "/adjust", label: "日程調整" },
   { to: "/match-results", label: "試合結果" },
   { to: "/scorers", label: "ランキング" },
+  { to: "/tactics", label: "戦術" },
   { to: "/members", label: "メンバー" },
   { to: "/news", label: "お知らせ" },
   { to: "/videos", label: "動画" },
