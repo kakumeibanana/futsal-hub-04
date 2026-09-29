@@ -23,12 +23,21 @@ export interface Piece {
   n?: number;
 }
 
+// 番号ごとの名前（作戦盤の「選手」で入れたもの）。a=赤・b=青。無ければ空
+export const NAME_MAX = 8;
+const parseNames = (raw: any): { a: string[]; b: string[] } => {
+  const pick = (v: unknown) =>
+    Array.isArray(v) ? v.slice(0, 15).map((x) => (typeof x === "string" ? x.slice(0, NAME_MAX) : "")) : [];
+  return { a: pick(raw?.a), b: pick(raw?.b) };
+};
+
 export interface Tactic {
   id: string;
   court: Court;
   name: string;
   note?: string;
   roster: { a: number; b: number };
+  names: { a: string[]; b: string[] };
   pieces: Piece[];
   frames: { x: number; y: number }[][];
 }
@@ -77,6 +86,7 @@ export const parseTactic = (id: string, raw: any): Tactic | null => {
     name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 40) : "作戦",
     note: typeof raw.note === "string" ? raw.note : undefined,
     roster: { a, b },
+    names: parseNames(raw.names),
     pieces,
     frames,
   };

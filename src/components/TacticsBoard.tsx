@@ -199,6 +199,21 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
                     {p.n}
                   </text>
                 )}
+                {p.t !== "ball" && tactic.names[p.t][p.n! - 1] && (
+                  // 名前はコマの下に出す。作戦盤と同じ大きさ・縁取り
+                  <text
+                    y={r + r * 0.9 * 0.95}
+                    dy="0.36em"
+                    textAnchor="middle"
+                    fill="#fff"
+                    stroke="#241D15"
+                    strokeWidth={r * 0.9 * 0.26}
+                    strokeLinejoin="round"
+                    style={{ fontSize: r * 0.9, fontWeight: 700, paintOrder: "stroke", pointerEvents: "none" }}
+                  >
+                    {tactic.names[p.t][p.n! - 1]}
+                  </text>
+                )}
               </g>
             );
           })}
