@@ -1,0 +1,2021 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>フットサル作戦盤（半面）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+</head><body>
+
+<style>
+  /* ============================================================
+     フットサル作戦盤 — STEP 3 + 保存
+
+     コート・床・コマをすべて1枚のSVGに統合してあるので、
+     画面表示とPNG書き出しが完全に一致する。
+     盤面の状態は frames[] にキーフレームとして積み、
+     再生時は隣り合うコマの間を補間して動かす。
+     保存は端末内（localStorage）とJSONファイルの2系統。
+     ============================================================ */
+
+  :root {
+    --hdr: 56px;
+    --dock: 134px;
+    --gap: 14px;
+
+    /* 半面（20×20m）を横向きに置く。左がゴール、右がハーフウェイライン。
+       ハーフウェイラインの先にも余白を取ってあるので、コマを置ける。 */
+    --vb-w: 28;
+    --vb-h: 23.2;
+
+    --bg: #EAE5DC;
+    --surface: #FFFFFF;
+    --sunken: #F4F0E8;
+    --ink: #241D15;
+    --muted: #6D6156;
+    --hair: rgba(36, 29, 21, 0.14);
+    --accent: #C33A2C;
+    --accent-ink: #FFFFFF;
+    --shadow-1: 0 1px 2px rgba(36, 29, 21, 0.12);
+    --shadow-2: 0 2px 6px rgba(36, 29, 21, 0.10), 0 14px 34px rgba(36, 29, 21, 0.13);
+    --scrim: rgba(36, 29, 21, 0.42);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14100C;
+      --surface: #221B14;
+      --sunken: #17120D;
+      --ink: #F2ECE3;
+      --muted: #A3958A;
+      --hair: rgba(242, 236, 227, 0.15);
+      --accent: #E8564A;
+      --accent-ink: #1A0B08;
+      --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+      --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 14px 34px rgba(0, 0, 0, 0.55);
+      --scrim: rgba(0, 0, 0, 0.62);
+    }
+  }
+
+  /* テーマ切替はメディアクエリより強く効かせる */
+  :root[data-theme="dark"] {
+    --bg: #14100C;
+    --surface: #221B14;
+    --sunken: #17120D;
+    --ink: #F2ECE3;
+    --muted: #A3958A;
+    --hair: rgba(242, 236, 227, 0.15);
+    --accent: #E8564A;
+    --accent-ink: #1A0B08;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 14px 34px rgba(0, 0, 0, 0.55);
+    --scrim: rgba(0, 0, 0, 0.62);
+  }
+
+  :root[data-theme="light"] {
+    --bg: #EAE5DC;
+    --surface: #FFFFFF;
+    --sunken: #F4F0E8;
+    --ink: #241D15;
+    --muted: #6D6156;
+    --hair: rgba(36, 29, 21, 0.14);
+    --accent: #C33A2C;
+    --accent-ink: #FFFFFF;
+    --shadow-1: 0 1px 2px rgba(36, 29, 21, 0.12);
+    --shadow-2: 0 2px 6px rgba(36, 29, 21, 0.10), 0 14px 34px rgba(36, 29, 21, 0.13);
+    --scrim: rgba(36, 29, 21, 0.42);
+  }
+
+  /* 盤面の暗転は外側のテーマに追従。書き出し時は属性値0に戻るので
+     共有画像は常に明るいまま出る。
+     0.2 だと選んだ木目がほぼ見えなくなるので 0.1 にした（2026-08-13）。 */
+  #dim { opacity: 0; }
+  @media (prefers-color-scheme: dark) { #dim { opacity: 0.1; } }
+  :root[data-theme="dark"] #dim { opacity: 0.1; }
+  :root[data-theme="light"] #dim { opacity: 0; }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic",
+      "Noto Sans JP", system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .app {
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ---------- ヘッダー ---------- */
+
+  .hd {
+    flex: none;
+    height: var(--hdr);
+    padding: 0 12px 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px solid var(--hair);
+    background: var(--surface);
+  }
+
+  .hd__id { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .hd__mark { flex: none; display: block; color: var(--accent); }
+  .hd__acts { flex: none; display: flex; align-items: center; gap: 8px; }
+
+  .hd__title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hd__btn {
+    flex: none;
+    height: 36px;
+    padding: 0 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--hair);
+    border-radius: 10px;
+    background: var(--sunken);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .hd__btn:hover { filter: brightness(0.98); }
+  .hd__btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  /* ---------- 盤面 ---------- */
+
+  .stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--gap);
+  }
+
+  .board {
+    /* 縦画面に収まる最大サイズを直接計算する（比率崩れを防ぐ） */
+    --stage-h: calc(
+      100dvh - var(--hdr) - var(--dock) - env(safe-area-inset-bottom, 0px) - (var(--gap) * 2)
+    );
+    width: min(100%, calc(var(--stage-h) * var(--vb-w) / var(--vb-h)));
+    aspect-ratio: var(--vb-w) / var(--vb-h);
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .board.is-playing { cursor: default; }
+  .court { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ---------- 下部の操作バー（親指ゾーン） ---------- */
+
+  .dock {
+    flex: none;
+    height: calc(var(--dock) + env(safe-area-inset-bottom, 0px));
+    padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-top: 1px solid var(--hair);
+    background: var(--surface);
+  }
+
+  /* コマ送りのフィルムストリップ */
+
+  .film { display: flex; align-items: center; gap: 8px; height: 40px; }
+
+  .film__strip {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .film__strip::-webkit-scrollbar { display: none; }
+
+  .chip {
+    flex: none;
+    height: 38px;
+    min-width: 38px;
+    padding: 0 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: 1px solid var(--hair);
+    border-radius: 11px;
+    background: var(--sunken);
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+
+  .chip > span { min-width: 34px; text-align: center; }
+  .chip:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  .chip.is-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  .chip__x {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.18);
+    color: inherit;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .chip__x:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 1px; }
+
+  .film__add {
+    flex: none;
+    height: 38px;
+    padding: 0 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px dashed var(--hair);
+    border-radius: 11px;
+    background: transparent;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .film__add:hover { background: var(--sunken); }
+  .film__add:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  /* モード切替。
+     作戦盤（既定）… 動かしても記録しない。人前で見せながら動かせる。
+     作る        … 動かすとそのコマに記録される。
+     行の高さは同じままにして、切り替えで盤面が跳ねないようにする。 */
+
+  .film__mode {
+    flex: none;
+    height: 38px;
+    padding: 0 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--hair);
+    border-radius: 11px;
+    background: var(--sunken);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .film__mode:hover { filter: brightness(0.98); }
+  .film__mode:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  /* 作戦盤のときは、コマ送りの道具をしまって切替だけを出す */
+  .dock:not(.is-editing) #strip,
+  .dock:not(.is-editing) #addFrame { display: none; }
+  .dock:not(.is-editing) .film__mode { flex: 1 1 auto; }
+
+  /* 作るときは、切替を記号だけに縮めて帯に幅を譲る */
+  .dock.is-editing .film__mode {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    padding: 0 11px;
+  }
+  .dock.is-editing #modeLabel { display: none; }
+
+  /* 操作ボタン */
+
+  .acts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  .btn {
+    height: 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 0;
+    border-radius: 14px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: transform 0.12s ease, filter 0.12s ease;
+  }
+
+  .btn svg { flex: none; }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.985); }
+  .btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .btn[disabled] { opacity: 0.45; cursor: default; transform: none; filter: none; }
+
+  .btn--primary { background: var(--accent); color: var(--accent-ink); }
+  .btn--ghost { background: var(--sunken); color: var(--ink); border: 1px solid var(--hair); }
+
+  /* ---------- 横長の画面（PC・タブレット横・スマホ横） ----------
+     盤面を高さいっぱいに出し、操作は右の帯に移す。
+     --dock を 0 にするので、盤面の高さの計算はそのまま効く。 */
+
+  @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+    :root { --dock: 0px; }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: var(--hdr) minmax(0, 1fr);
+    }
+
+    .hd { grid-column: 1 / -1; }
+    .stage { grid-column: 1; grid-row: 2; }
+
+    .dock {
+      grid-column: 2;
+      grid-row: 2;
+      height: auto;
+      padding: 20px 18px;
+      justify-content: center;
+      gap: 18px;
+      border-top: 0;
+      border-left: 1px solid var(--hair);
+    }
+  }
+
+  /* ---------- シート共通 ---------- */
+
+  .sheet {
+    width: min(440px, calc(100vw - 24px));
+    max-height: 88dvh;
+    margin: auto auto 0;
+    padding: 0;
+    border: 0;
+    border-radius: 18px 18px 0 0;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-2);
+  }
+
+  .sheet::backdrop { background: var(--scrim); }
+  .sheet[open] { display: flex; flex-direction: column; }
+
+  .sheet__hd {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 12px 14px 18px;
+    border-bottom: 1px solid var(--hair);
+  }
+
+  .sheet__hd h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.03em; }
+
+  .x {
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 17px;
+    cursor: pointer;
+  }
+
+  .x:hover { background: var(--sunken); }
+  .x:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  .sheet__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 16px 18px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sheet__body--list { align-items: stretch; gap: 14px; }
+
+  .shot {
+    max-width: 100%;
+    max-height: 42dvh;
+    border-radius: 8px;
+    box-shadow: var(--shadow-1);
+    background: var(--sunken);
+  }
+
+  .hint { margin: 0; font-size: 12px; color: var(--muted); text-align: center; display: none; }
+  @media (pointer: coarse) { .hint { display: block; } }
+
+  .sheet__act {
+    flex: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sheet__act.is-single { grid-template-columns: 1fr; }
+
+  /* ---------- 作戦シート ---------- */
+
+  .saverow { display: flex; gap: 8px; }
+
+  .saverow input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 48px;
+    padding: 0 13px;
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    background: var(--sunken);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 15px;
+  }
+
+  .saverow input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .saverow .btn { height: 48px; padding: 0 20px; }
+
+  .plist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+  .pitem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 10px 10px 13px;
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    background: var(--sunken);
+  }
+
+  .pitem__t { flex: 1 1 auto; min-width: 0; }
+
+  .pitem__n {
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pitem__m {
+    font-size: 11px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+  }
+
+  .mini {
+    flex: none;
+    height: 38px;
+    padding: 0 13px;
+    border: 1px solid var(--hair);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .mini:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .mini--quiet { background: transparent; border-color: transparent; color: var(--muted); padding: 0 9px; }
+  .mini--danger { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+  .empty { font-size: 13px; color: var(--muted); text-align: center; padding: 18px 0; margin: 0; }
+  .note { font-size: 12px; line-height: 1.6; color: var(--muted); margin: 0; }
+
+  /* ---------- 人数シート ---------- */
+
+  .rrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    background: var(--sunken);
+  }
+
+  .rrow__dot { flex: none; width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28); }
+  .rrow__dot--a { background: #CE3A2E; }
+  .rrow__dot--b { background: #1D5CA6; }
+
+  .rrow__name { flex: 1 1 auto; font-size: 15px; font-weight: 700; }
+
+  .rrow__n {
+    flex: none;
+    min-width: 42px;
+    text-align: center;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 19px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .step {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .step:hover { filter: brightness(0.97); }
+  .step:active { transform: translateY(1px); }
+  .step:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .step[disabled] { opacity: 0.35; cursor: default; transform: none; }
+
+  /* ---------- 通知 ---------- */
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--dock) + 18px + env(safe-area-inset-bottom, 0px));
+    transform: translate(-50%, 8px);
+    max-width: calc(100vw - 32px);
+    padding: 11px 16px;
+    border-radius: 11px;
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+    box-shadow: var(--shadow-2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 20;
+  }
+
+  .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn, .toast { transition: none; }
+  }
+</style>
+
+<div class="app">
+  <header class="hd">
+    <div class="hd__id">
+      <svg class="hd__mark" width="26" height="24" viewBox="0 0 26 24" fill="none" aria-hidden="true">
+        <path d="M13.9 1.5H1.5v21h12.4" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+        <path d="M13.9 8.2A4.4 4.4 0 0 1 13.9 15.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        <path d="M1.5 5.6a4.6 4.6 0 0 1 4.6 4.6v3.6a4.6 4.6 0 0 1-4.6 4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      </svg>
+      <span class="hd__title">フットサル作戦盤（半面）</span>
+    </div>
+    <div class="hd__acts">
+      <button class="hd__btn" id="openRoster" type="button">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="5.6" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5" />
+          <path d="M1.5 14c0-2.4 1.8-4 4.1-4s4.1 1.6 4.1 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          <path d="M11.4 3.2a2.3 2.3 0 0 1 0 4.3M12.2 10.4c1.4.5 2.3 1.8 2.3 3.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        人数
+      </button>
+      <button class="hd__btn" id="openPlays" type="button">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M1.7 4.2A1.5 1.5 0 0 1 3.2 2.7h2.9l1.5 1.8h5.2a1.5 1.5 0 0 1 1.5 1.5v6.3a1.5 1.5 0 0 1-1.5 1.5H3.2a1.5 1.5 0 0 1-1.5-1.5V4.2Z"
+                stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+        </svg>
+        作戦
+      </button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="board" id="board">
+      <!-- 床・ライン・コマをすべて内包する単一のSVG。
+           色と書体はSVG内で完結しているので、
+           そのまま切り出せば画面と同じ絵がPNGになる。 -->
+      <svg class="court" id="court" viewBox="-2.2 -1.6 28 23.2"
+           xmlns="http://www.w3.org/2000/svg" aria-label="フットサルコート（半面）" role="application">
+        <defs>
+          <linearGradient id="wood" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#EFE0C8" />
+            <stop offset="0.54" stop-color="#E6D3B6" />
+            <stop offset="1" stop-color="#DCC6A4" />
+          </linearGradient>
+
+          <pattern id="grain" width="1" height="1.288" patternUnits="userSpaceOnUse">
+            <path d="M0 0H1" stroke="#4A2A0D" stroke-opacity="0.025" stroke-width="0.035" />
+            <path d="M0 0.43H1M0 0.86H1" stroke="#FFE2B6" stroke-opacity="0.01" stroke-width="0.02" />
+          </pattern>
+
+          <radialGradient id="gymlight" cx="0.1" cy="0.5" r="0.75">
+            <stop offset="0" stop-color="#FFF6E0" stop-opacity="0.1" />
+            <stop offset="1" stop-color="#FFF6E0" stop-opacity="0" />
+          </radialGradient>
+
+          <pattern id="net" width="0.42" height="0.42" patternUnits="userSpaceOnUse">
+            <path d="M0.42 0V0.42M0 0.42H0.42" stroke="#FFFCF6" stroke-opacity="0.5" stroke-width="0.055" />
+          </pattern>
+
+          <radialGradient id="magA" cx="0.34" cy="0.26" r="0.84">
+            <stop offset="0" stop-color="#E8604F" />
+            <stop offset="0.62" stop-color="#CE3A2E" />
+            <stop offset="1" stop-color="#96261D" />
+          </radialGradient>
+
+          <radialGradient id="magB" cx="0.34" cy="0.26" r="0.84">
+            <stop offset="0" stop-color="#3F87D6" />
+            <stop offset="0.62" stop-color="#1D5CA6" />
+            <stop offset="1" stop-color="#123F73" />
+          </radialGradient>
+
+          <radialGradient id="magBall" cx="0.33" cy="0.25" r="0.85">
+            <stop offset="0" stop-color="#FFF3BE" />
+            <stop offset="0.55" stop-color="#F0CE3F" />
+            <stop offset="1" stop-color="#C79E19" />
+          </radialGradient>
+        </defs>
+
+        <style>
+          .pc { cursor: grab; }
+          .pc.is-grab { cursor: grabbing; }
+          .pcb {
+            transform-box: fill-box;
+            transform-origin: center;
+            transition: transform 0.14s cubic-bezier(0.3, 0.9, 0.3, 1);
+          }
+          .pc.is-grab .pcb { transform: scale(1.16); }
+          .pc.homing { transition: transform 0.44s cubic-bezier(0.22, 0.92, 0.24, 1); }
+          .pc.enter .pcb { animation: pop 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) backwards; }
+          @keyframes pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+          .rim { fill: none; stroke: #000; stroke-opacity: 0.32; stroke-width: 0.1; }
+          .ring { fill: none; stroke: #FFFDF6; stroke-width: 0.22; opacity: 0; }
+          .pc:focus-visible { outline: none; }
+          .pc:focus-visible .ring { opacity: 1; }
+          .num {
+            font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", sans-serif;
+            font-size: 1.32px;
+            font-weight: 700;
+            fill: #FFFFFF;
+            text-anchor: middle;
+            pointer-events: none;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .pcb, .pc.homing { transition: none; }
+            .pc.enter .pcb { animation: none; }
+          }
+        </style>
+
+        <!-- 体育館のフローリング -->
+        <g id="floor">
+          <rect x="-2.2" y="-1.6" width="28" height="23.2" fill="url(#wood)" />
+          <rect x="-2.2" y="-1.6" width="28" height="23.2" fill="url(#grain)" />
+          <rect x="-2.2" y="-1.6" width="28" height="23.2" fill="url(#gymlight)" />
+          <rect id="dim" x="-2.2" y="-1.6" width="28" height="23.2" fill="#080502" opacity="0" />
+        </g>
+
+        <!-- ゴールネット（左） -->
+        <rect x="-1.1" y="8.5" width="1.1" height="3" fill="url(#net)" />
+
+        <!-- ライン（すべて実寸: コートは 40m × 20m のうち、ゴール側の半面 20m × 20m） -->
+        <g fill="none" stroke="#FFFFFF" stroke-opacity="1" stroke-width="0.24" stroke-linecap="round">
+          <path d="M0 8.5H-1.1V11.5H0" stroke-width="0.28" />
+
+          <!-- 外周（ハーフウェイラインまで） -->
+          <path d="M20 0H0V20H20" />
+          <path d="M20 0V20" />
+
+          <!-- センターサークル（半径3m）の、こちら側の半分 -->
+          <path d="M20 7A3 3 0 0 0 17 10A3 3 0 0 0 20 13" />
+
+          <!-- ペナルティエリア: ゴールポストを中心とした半径6mの円弧 -->
+          <path d="M0 2.5A6 6 0 0 1 6 8.5L6 11.5A6 6 0 0 1 0 17.5" />
+
+          <!-- コーナーアーク（半径25cm） -->
+          <path d="M0.25 0A0.25 0.25 0 0 1 0 0.25" />
+          <path d="M0 19.75A0.25 0.25 0 0 1 0.25 20" />
+
+          <!-- 交代ゾーン（ハーフウェイラインから5m〜10m。上のタッチラインの外側に印） -->
+          <path d="M10 0V-0.8M15 0V-0.8" stroke-width="0.22" />
+        </g>
+
+        <!-- 第1PKマーク（6m）・第2PKマーク（10m）・センターマーク -->
+        <g fill="#FFFFFF" fill-opacity="1">
+          <circle cx="6" cy="10" r="0.15" />
+          <circle cx="10" cy="10" r="0.15" />
+          <circle cx="20" cy="10" r="0.15" />
+        </g>
+
+        <g id="pieces"></g>
+      </svg>
+    </div>
+  </main>
+
+  <div class="dock">
+    <div class="film">
+      <button class="film__mode" id="modeBtn" type="button" aria-pressed="false">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M9.1 1.7 12.3 4.9 5 12.2 1.5 12.5l.3-3.5 7.3-7.3Z"
+                stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+        </svg>
+        <span id="modeLabel">動きを作る</span>
+      </button>
+      <div class="film__strip" id="strip" role="tablist" aria-label="コマ送り"></div>
+      <button class="film__add" id="addFrame" type="button">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M7 1.6v10.8M1.6 7h10.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        コマ
+      </button>
+    </div>
+
+    <div class="acts">
+      <button class="btn btn--primary" id="play" type="button">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
+          <path id="playIcon" d="M4.4 2.6 14 8.5l-9.6 5.9V2.6Z" fill="currentColor" />
+        </svg>
+        <span id="playLabel">再生</span>
+      </button>
+      <button class="btn btn--ghost" id="reset" type="button">
+        <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <path d="M15 9a6 6 0 1 1-1.9-4.4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
+          <path d="M14.6 1.6v3.6H11" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        リセット
+      </button>
+      <button class="btn btn--ghost" id="save" type="button">
+        <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <path d="M9 1.8v9.4M5.4 7.8 9 11.4l3.6-3.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M2.4 12.6v1.8a1.8 1.8 0 0 0 1.8 1.8h9.6a1.8 1.8 0 0 0 1.8-1.8v-1.8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
+        </svg>
+        画像
+      </button>
+    </div>
+  </div>
+</div>
+
+<dialog class="sheet" id="sheet" aria-labelledby="sheetTitle">
+  <div class="sheet__hd">
+    <h2 id="sheetTitle">保存する画像</h2>
+    <button class="x" id="closeSheet" type="button" aria-label="閉じる">✕</button>
+  </div>
+  <div class="sheet__body">
+    <img class="shot" id="shot" alt="書き出したコート図" />
+    <p class="hint">画像を長押しすると、そのまま端末に保存できます</p>
+  </div>
+  <div class="sheet__act" id="sheetAct">
+    <button class="btn btn--ghost" id="share" type="button">共有</button>
+    <a class="btn btn--primary" id="download" download="futsal-board.png">ダウンロード</a>
+  </div>
+</dialog>
+
+<dialog class="sheet" id="roster" aria-labelledby="rosterTitle">
+  <div class="sheet__hd">
+    <h2 id="rosterTitle">人数</h2>
+    <button class="x" id="closeRoster" type="button" aria-label="閉じる">✕</button>
+  </div>
+  <div class="sheet__body sheet__body--list">
+    <div class="rrow">
+      <span class="rrow__dot rrow__dot--a" aria-hidden="true"></span>
+      <span class="rrow__name">赤チーム</span>
+      <button class="step" type="button" data-team="a" data-d="-1" aria-label="赤チームを1人減らす">−</button>
+      <span class="rrow__n" id="nA" aria-live="polite">5</span>
+      <button class="step" type="button" data-team="a" data-d="1" aria-label="赤チームを1人増やす">＋</button>
+    </div>
+    <div class="rrow">
+      <span class="rrow__dot rrow__dot--b" aria-hidden="true"></span>
+      <span class="rrow__name">青チーム</span>
+      <button class="step" type="button" data-team="b" data-d="-1" aria-label="青チームを1人減らす">−</button>
+      <span class="rrow__n" id="nB" aria-live="polite">5</span>
+      <button class="step" type="button" data-team="b" data-d="1" aria-label="青チームを1人増やす">＋</button>
+    </div>
+    <p class="note">各チーム1〜15人まで。人数を変えても、いま盤面にあるコマの位置とコマ送りはそのまま残ります。増えた分だけ自陣に並びます。</p>
+  </div>
+  <div class="sheet__act is-single">
+    <button class="btn btn--ghost" id="rosterReset" type="button">この人数で配置をやり直す</button>
+  </div>
+</dialog>
+
+<dialog class="sheet" id="plays" aria-labelledby="playsTitle">
+  <div class="sheet__hd">
+    <h2 id="playsTitle">作戦</h2>
+    <button class="x" id="closePlays" type="button" aria-label="閉じる">✕</button>
+  </div>
+  <div class="sheet__body sheet__body--list">
+    <div class="saverow">
+      <input id="playName" type="text" placeholder="作戦の名前（例: キックイン右）" maxlength="40"
+             autocomplete="off" aria-label="作戦の名前" />
+      <button class="btn btn--primary" id="savePlay" type="button">保存</button>
+    </div>
+    <ul class="plist" id="plist"></ul>
+    <p class="note" id="storeNote"></p>
+  </div>
+  <div class="sheet__act">
+    <button class="btn btn--ghost" id="exportJSON" type="button">JSONで書き出し</button>
+    <button class="btn btn--ghost" id="importJSON" type="button">JSONを読み込み</button>
+  </div>
+</dialog>
+
+<input type="file" id="fileInput" accept="application/json,.json" hidden />
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  (function () {
+    "use strict";
+
+    /* SVG の viewBox = コートの実寸座標系（単位はメートル） */
+    var VB = { x: -2.2, y: -1.6, w: 28, h: 23.2 };
+
+    var PLAYER_R = 1.3;
+    var BALL_R = 0.85;
+    var EXPORT_W = 1680;   /* 書き出し幅（px）。高さは実寸比から決まる */
+    var SEG_MS = 900;      /* コマ間の再生時間 */
+    var MAX_FRAMES = 24;
+    var MAX_PLAYS = 50;
+    var SVGNS = "http://www.w3.org/2000/svg";
+
+    var KEY_WORK = "futsal-board-half.work.v1";
+    var KEY_PLAYS = "futsal-board-half.plays.v1";
+
+    var MIN_TEAM = 1;
+    var MAX_TEAM = 15;
+    var DEF_TEAM = 5;
+
+    /* 5人のときの初期配置：1-2-1（ダイヤモンド）。
+       手で決めた形なので、5人だけは自動生成に任せず定数で持つ。
+       半面は横向き。左がゴール（x=0）、右がハーフウェイライン（x=20）。
+       青チームが守り（左のゴール前）、赤チームが攻め（右から左へ）。 */
+    var DIAMOND5 = [
+      { x: 2.4, y: 10 },
+      { x: 5.8, y: 10 },
+      { x: 8.5, y: 4.6 },
+      { x: 8.5, y: 15.4 },
+      { x: 10.5, y: 10 }
+    ];
+
+    /* 5人以外は自動で並べる。1番はゴール前、残りは縦4人ずつの列で。 */
+    function spread(n) {
+      var out = [{ x: 2.4, y: 10 }];
+      var rest = n - 1;
+      if (rest <= 0) return out;
+
+      var perRow = 4;
+      var rows = Math.ceil(rest / perRow);
+      var placed = 0;
+
+      for (var r = 0; r < rows; r++) {
+        var c = Math.min(perRow, rest - placed);
+        var x = rows === 1 ? 8 : 5.5 + (5 / (rows - 1)) * r;
+        for (var i = 0; i < c; i++) {
+          out.push({ x: x, y: c === 1 ? 10 : 3 + (14 / (c - 1)) * i });
+        }
+        placed += c;
+      }
+      return out;
+    }
+
+    /* 赤チームは青チームの配置を x=13 で折り返したもの（x → 26 - x） */
+    function formation(t, n) {
+      var base = (n === DEF_TEAM)
+        ? DIAMOND5.map(function (p) { return { x: p.x, y: p.y }; })
+        : spread(n);
+
+      if (t === "b") return base;
+      return base.map(function (p) { return { x: 26 - p.x, y: p.y }; });
+    }
+
+    /* 盤面に並ぶコマの一覧。順番は 青1..N → 赤1..N → ボール で固定。 */
+    function makePieces(na, nb) {
+      var out = [];
+      formation("b", nb).forEach(function (p, i) {
+        out.push({ t: "b", n: i + 1, x: p.x, y: p.y });
+      });
+      formation("a", na).forEach(function (p, i) {
+        out.push({ t: "a", n: i + 1, x: p.x, y: p.y });
+      });
+      out.push({ t: "ball", x: 13, y: 10 });
+      return out;
+    }
+
+    function clampTeam(n) {
+      n = Math.floor(Number(n));
+      if (!isFinite(n)) return DEF_TEAM;
+      return n < MIN_TEAM ? MIN_TEAM : n > MAX_TEAM ? MAX_TEAM : n;
+    }
+
+    var roster = { a: DEF_TEAM, b: DEF_TEAM };
+
+    /* いまの人数における初期配置。人数を変えるたびに作り直す。 */
+    var START = makePieces(roster.a, roster.b);
+
+    var FILL = { a: "url(#magA)", b: "url(#magB)", ball: "url(#magBall)" };
+    var SIDE = { a: "赤チーム", b: "青チーム" };
+
+    var board = document.getElementById("board");
+    var court = document.getElementById("court");
+    var layer = document.getElementById("pieces");
+    var strip = document.getElementById("strip");
+    var toastEl = document.getElementById("toast");
+
+    /* false = 作戦盤（動かしても記録しない）／ true = 作る（コマに記録する）。
+       開いたときは作戦盤から。人前で出してそのまま使える状態を既定にする。 */
+    var editing = false;
+
+    var state = [];   /* 盤面のいまの位置 */
+    var nodes = [];   /* 各コマのSVG要素 */
+    var frames = [];  /* キーフレーム。frames[cur] が編集中のコマ */
+    var cur = 0;
+
+    function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+    function radiusOf(i) { return state[i].t === "ball" ? BALL_R : PLAYER_R; }
+
+    function place(i) {
+      nodes[i].style.transform =
+        "translate(" + state[i].x.toFixed(3) + "px," + state[i].y.toFixed(3) + "px)";
+    }
+
+    function el(name, attrs) {
+      var n = document.createElementNS(SVGNS, name);
+      for (var k in attrs) { n.setAttribute(k, attrs[k]); }
+      return n;
+    }
+
+    var toastTimer = null;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add("is-on");
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(function () { toastEl.classList.remove("is-on"); }, 3200);
+    }
+
+    /* ---------- 保存領域（使えない環境でも落ちないようにする） ---------- */
+
+    var LS = (function () {
+      var ok = false;
+      try {
+        var probe = "__fb__";
+        window.localStorage.setItem(probe, "1");
+        window.localStorage.removeItem(probe);
+        ok = true;
+      } catch (e) { ok = false; }
+
+      return {
+        ok: ok,
+        get: function (k) { try { return ok ? window.localStorage.getItem(k) : null; } catch (e) { return null; } },
+        set: function (k, v) { try { if (!ok) return false; window.localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+        del: function (k) { try { if (ok) window.localStorage.removeItem(k); } catch (e) { /* 無視 */ } }
+      };
+    })();
+
+    /* キーフレームを [x, y] の配列に落とす。小数2桁で十分な精度。 */
+    function serializeFrames(fs) {
+      return fs.map(function (f) {
+        return f.map(function (p) {
+          return [Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100];
+        });
+      });
+    }
+
+    /* 保存データに入っている人数を読む。
+       人数を持たない古いデータ（5対5固定だった頃のもの）は 5対5 として扱う。 */
+    function parseRoster(raw) {
+      if (!raw || typeof raw !== "object") return { a: DEF_TEAM, b: DEF_TEAM };
+      return { a: clampTeam(raw.a), b: clampTeam(raw.b) };
+    }
+
+    /* 外から来たデータは一切信用せず、形と値域を検査してから通す。
+       list を渡すと、その人数構成に対して検査する（省略時はいまの盤面）。 */
+    function parseFrames(raw, list) {
+      if (!Array.isArray(raw) || raw.length < 1) return null;
+      list = list || START;
+
+      var out = [];
+      for (var i = 0; i < raw.length && out.length < MAX_FRAMES; i++) {
+        var f = raw[i];
+        if (!Array.isArray(f) || f.length !== list.length) return null;
+
+        var frame = [];
+        for (var j = 0; j < f.length; j++) {
+          var p = f[j], x, y;
+
+          if (Array.isArray(p)) { x = p[0]; y = p[1]; }
+          else if (p && typeof p === "object") { x = p.x; y = p.y; }
+          else return null;
+
+          if (typeof x !== "number" || typeof y !== "number" ||
+              !isFinite(x) || !isFinite(y)) return null;
+
+          var rad = list[j].t === "ball" ? BALL_R : PLAYER_R;
+          frame.push({
+            x: clamp(x, VB.x + rad, VB.x + VB.w - rad),
+            y: clamp(y, VB.y + rad, VB.y + VB.h - rad)
+          });
+        }
+        out.push(frame);
+      }
+      return out.length ? out : null;
+    }
+
+    /* 保存データ（人数つき）を読んで、盤面ごと差し替える。
+       読めなければ false を返し、いまの盤面には触らない。 */
+    function loadRecord(rec) {
+      var r = parseRoster(rec && rec.roster);
+      var list = makePieces(r.a, r.b);
+      var f = parseFrames(rec && rec.frames, list);
+      if (!f) return null;
+      return { roster: r, pieces: list, frames: f };
+    }
+
+    /* ---------- 盤面の組み立て ---------- */
+
+    function capture() {
+      return state.map(function (p) { return { x: p.x, y: p.y }; });
+    }
+
+    /* 盤面のいまの配置をコマに焼き付ける。
+       作戦盤モードでは何も書かない。人前で動かして見せても、作った動きが壊れない。 */
+    function commit() {
+      if (playing || !editing) return;
+      frames[cur] = capture();
+      scheduleAutosave();
+    }
+
+    var autoTimer = null;
+    function scheduleAutosave() {
+      if (!LS.ok) return;
+      window.clearTimeout(autoTimer);
+      autoTimer = window.setTimeout(function () {
+        LS.set(KEY_WORK, JSON.stringify({
+          v: 1,
+          cur: cur,
+          roster: { a: roster.a, b: roster.b },
+          frames: serializeFrames(frames)
+        }));
+      }, 400);
+    }
+
+    function restoreWork() {
+      var raw = LS.get(KEY_WORK);
+      if (!raw) return null;
+      try {
+        var d = JSON.parse(raw);
+        var rec = loadRecord(d);
+        if (!rec) return null;
+        var c = (d && typeof d.cur === "number") ? clamp(Math.floor(d.cur), 0, rec.frames.length - 1) : 0;
+        rec.cur = c;
+        return rec;
+      } catch (e) { return null; }
+    }
+
+    /* コマのSVGを一から並べ直す。人数が変わったときもここを通る。 */
+    function mountPieces() {
+      layer.textContent = "";
+      state = [];
+      nodes = [];
+
+      var frag = document.createDocumentFragment();
+
+      START.forEach(function (p, i) {
+        state.push({ t: p.t, n: p.n, x: p.x, y: p.y });
+
+        var r = p.t === "ball" ? BALL_R : PLAYER_R;
+
+        var g = el("g", {
+          "class": "pc enter",
+          "data-i": String(i),
+          tabindex: "0",
+          role: "button",
+          "aria-label": p.t === "ball" ? "ボール" : SIDE[p.t] + " " + p.n + "番"
+        });
+
+        var body = el("g", { "class": "pcb" });
+        body.style.animationDelay = i * 28 + "ms";
+
+        body.appendChild(el("circle", { "class": "disc", r: r, fill: FILL[p.t] }));
+        body.appendChild(el("circle", { "class": "rim", r: r }));
+        body.appendChild(el("circle", { "class": "ring", r: r + 0.32 }));
+
+        if (p.t !== "ball") {
+          var t = el("text", { "class": "num", x: 0, y: 0, dy: "0.36em" });
+          t.textContent = String(p.n);
+          body.appendChild(t);
+        }
+
+        g.appendChild(body);
+        nodes.push(g);
+        frag.appendChild(g);
+      });
+
+      layer.appendChild(frag);
+
+      /* enter は fill-mode: backwards なので必ず外す。
+         描画が止まる環境でコマが縮んだまま固定されるのを防ぐ。 */
+      nodes.forEach(function (n) {
+        n.addEventListener("animationend", function () { n.classList.remove("enter"); }, { once: true });
+      });
+      window.setTimeout(function () {
+        nodes.forEach(function (n) { n.classList.remove("enter"); });
+      }, START.length * 28 + 900);
+    }
+
+    /* 人数が変わったとき、既存のコマ送りを新しい構成に移し替える。
+       同じチーム・同じ番号のコマは位置をそのまま引き継ぎ、
+       増えた分は新しい初期配置に置く。減った分は落とす。 */
+    function remapFrames(oldPieces, newPieces, oldFrames) {
+      return oldFrames.map(function (f) {
+        return newPieces.map(function (np) {
+          for (var k = 0; k < oldPieces.length; k++) {
+            var op = oldPieces[k];
+            if (op.t === np.t && op.n === np.n) return { x: f[k].x, y: f[k].y };
+          }
+          return { x: np.x, y: np.y };
+        });
+      });
+    }
+
+    /* 人数を変える。keep=false なら配置ごと初期化する。 */
+    function setRoster(na, nb, keep) {
+      na = clampTeam(na);
+      nb = clampTeam(nb);
+      if (keep && na === roster.a && nb === roster.b) return;
+
+      stop();
+      endDrag();
+
+      var oldPieces = START;
+      var oldFrames = frames;
+
+      roster.a = na;
+      roster.b = nb;
+      START = makePieces(na, nb);
+
+      frames = keep
+        ? remapFrames(oldPieces, START, oldFrames)
+        : [START.map(function (p) { return { x: p.x, y: p.y }; })];
+
+      cur = clamp(cur, 0, frames.length - 1);
+      mountPieces();
+      showFrame(cur, false);
+      syncRosterUI();
+    }
+
+    function build() {
+      /* 前回の続きがあれば、人数ごと復元する */
+      var work = restoreWork();
+
+      if (work) {
+        roster = work.roster;
+        START = work.pieces;
+        mountPieces();
+        frames = work.frames;
+        showFrame(work.cur, false);
+      } else {
+        mountPieces();
+        state.forEach(function (_, i) { place(i); });
+        frames = [capture()];
+        cur = 0;
+        renderStrip();
+      }
+
+      syncRosterUI();
+      setEditing(false, true);
+    }
+
+    /* ---------- ドラッグ（マウス・タッチ・ペン共通） ---------- */
+
+    var drag = null;
+
+    layer.addEventListener("pointerdown", function (e) {
+      if (playing) return;
+
+      var g = e.target.closest(".pc");
+      if (!g) return;
+
+      var i = +g.getAttribute("data-i");
+      var rect = board.getBoundingClientRect();
+      /* 掴んだ位置とコマ中心のズレを保つと、指の下でコマが飛ばない */
+      var cx = rect.left + ((state[i].x - VB.x) / VB.w) * rect.width;
+      var cy = rect.top + ((state[i].y - VB.y) / VB.h) * rect.height;
+
+      drag = { i: i, g: g, rect: rect, dx: e.clientX - cx, dy: e.clientY - cy };
+
+      g.setPointerCapture(e.pointerId);
+      g.classList.remove("homing");
+      g.classList.add("is-grab");
+      e.preventDefault();
+    });
+
+    layer.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+
+      var r = drag.rect;
+      var mx = VB.x + ((e.clientX - drag.dx - r.left) / r.width) * VB.w;
+      var my = VB.y + ((e.clientY - drag.dy - r.top) / r.height) * VB.h;
+      var rad = radiusOf(drag.i);
+
+      state[drag.i].x = clamp(mx, VB.x + rad, VB.x + VB.w - rad);
+      state[drag.i].y = clamp(my, VB.y + rad, VB.y + VB.h - rad);
+      place(drag.i);
+      e.preventDefault();
+    });
+
+    function endDrag() {
+      if (!drag) return;
+      drag.g.classList.remove("is-grab");
+      drag = null;
+      commit();
+    }
+
+    layer.addEventListener("pointerup", endDrag);
+    layer.addEventListener("pointercancel", endDrag);
+
+    /* ---------- キーボード操作（矢印キーで 0.5m ずつ） ---------- */
+
+    var STEP = { ArrowUp: [0, -0.5], ArrowDown: [0, 0.5], ArrowLeft: [-0.5, 0], ArrowRight: [0.5, 0] };
+
+    layer.addEventListener("keydown", function (e) {
+      var move = STEP[e.key];
+      var g = e.target.closest(".pc");
+      if (!move || !g || playing) return;
+
+      var i = +g.getAttribute("data-i");
+      var rad = radiusOf(i);
+
+      state[i].x = clamp(state[i].x + move[0], VB.x + rad, VB.x + VB.w - rad);
+      state[i].y = clamp(state[i].y + move[1], VB.y + rad, VB.y + VB.h - rad);
+      place(i);
+      commit();
+      e.preventDefault();
+    });
+
+    /* ---------- コマ送り ---------- */
+
+    var homingTimer = null;
+
+    function clearHoming() {
+      nodes.forEach(function (n) { n.classList.remove("homing"); });
+    }
+
+    function showFrame(i, animate) {
+      cur = i;
+      frames[i].forEach(function (p, k) { state[k].x = p.x; state[k].y = p.y; });
+
+      if (animate) nodes.forEach(function (n) { n.classList.add("homing"); });
+      state.forEach(function (_, k) { place(k); });
+      if (animate) {
+        window.clearTimeout(homingTimer);
+        homingTimer = window.setTimeout(clearHoming, 480);
+      }
+      renderStrip();
+      scheduleAutosave();
+    }
+
+    function renderStrip() {
+      strip.textContent = "";
+
+      frames.forEach(function (_, i) {
+        var chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "chip" + (i === cur ? " is-on" : "");
+        chip.setAttribute("role", "tab");
+        chip.setAttribute("aria-selected", i === cur ? "true" : "false");
+        chip.setAttribute("aria-label", "コマ " + (i + 1));
+
+        var num = document.createElement("span");
+        num.textContent = String(i + 1);
+        chip.appendChild(num);
+
+        chip.addEventListener("click", function () {
+          stop();
+          if (i !== cur) showFrame(i, true);
+        });
+
+        /* 選択中のコマだけ削除ボタンを開く。常時出すと指で誤爆しやすい。 */
+        if (i === cur && frames.length > 1) {
+          var x = document.createElement("button");
+          x.type = "button";
+          x.className = "chip__x";
+          x.textContent = "✕";
+          x.setAttribute("aria-label", "コマ " + (i + 1) + " を削除");
+          x.addEventListener("click", function (e) {
+            e.stopPropagation();
+            removeFrame(i);
+          });
+          chip.appendChild(x);
+        }
+
+        strip.appendChild(chip);
+      });
+
+      var active = strip.children[cur];
+      if (active && active.scrollIntoView) {
+        active.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+
+      document.getElementById("play").disabled = frames.length < 2;
+    }
+
+    function addFrame() {
+      stop();
+
+      if (frames.length >= MAX_FRAMES) {
+        toast("コマは " + MAX_FRAMES + " 個までです");
+        return;
+      }
+
+      /* いまの配置を複製して次のコマにする。動かせば差分が動きになる。 */
+      frames.splice(cur + 1, 0, capture());
+      cur += 1;
+      renderStrip();
+      scheduleAutosave();
+      toast("コマ " + (cur + 1) + " を追加。動かすと差分が動きになります");
+    }
+
+    function removeFrame(i) {
+      if (frames.length <= 1) return;
+      stop();
+      frames.splice(i, 1);
+      showFrame(Math.min(cur, frames.length - 1), true);
+    }
+
+    document.getElementById("addFrame").addEventListener("click", addFrame);
+
+    /* ---------- モードの切替 ---------- */
+
+    var dockEl = document.querySelector(".dock");
+    var modeBtn = document.getElementById("modeBtn");
+    var modeLabel = document.getElementById("modeLabel");
+
+    /* 切り替えても盤面には触らない。
+       触ると、見せている途中で切り替えた人の画面が急に変わる。
+       変わるのは「これから動かした分を記録するかどうか」だけ。 */
+    function setEditing(on, quiet) {
+      editing = !!on;
+      dockEl.classList.toggle("is-editing", editing);
+      modeBtn.setAttribute("aria-pressed", editing ? "true" : "false");
+      modeBtn.setAttribute("aria-label", editing ? "動きを作るのをやめる" : "動きを作る");
+      modeBtn.title = editing ? "作戦盤にもどる" : "動きを作る";
+      modeLabel.textContent = "動きを作る";
+      if (quiet) return;
+      toast(editing
+        ? "動きを作ります。動かすと、いま選んでいるコマに記録されます"
+        : "作戦盤にもどりました。動かしても記録されません");
+    }
+
+    modeBtn.addEventListener("click", function () {
+      stop();
+      setEditing(!editing);
+    });
+
+    /* ---------- 再生 ---------- */
+
+    var playing = false;
+    var raf = null;
+    var playBtn = document.getElementById("play");
+    var playLabel = document.getElementById("playLabel");
+    var playIcon = document.getElementById("playIcon");
+
+    var PLAY_D = "M4.4 2.6 14 8.5l-9.6 5.9V2.6Z";
+    var STOP_D = "M3.6 3.6h9.8v9.8H3.6V3.6Z";
+
+    function ease(u) {
+      return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    }
+
+    function setPlayUI(on) {
+      playLabel.textContent = on ? "停止" : "再生";
+      playIcon.setAttribute("d", on ? STOP_D : PLAY_D);
+      board.classList.toggle("is-playing", on);
+    }
+
+    function play() {
+      if (frames.length < 2) return;
+
+      endDrag();
+      clearHoming();
+      playing = true;
+      setPlayUI(true);
+
+      var total = (frames.length - 1) * SEG_MS;
+      var shown = -1;
+
+      /* 基準時刻は必ず最初のtickのタイムスタンプから取る。
+         rAF が渡す now は「現フレームの描画開始時刻」なので、
+         直前に読んだ performance.now() より過去になることがある。
+         その差で elapsed が負になると添字が -1 になって壊れる。 */
+      var t0 = null;
+
+      function step(now) {
+        if (!playing) return;
+        if (t0 === null) t0 = now;
+
+        var elapsed = now - t0;
+
+        if (elapsed >= total) {
+          playing = false;
+          setPlayUI(false);
+          showFrame(frames.length - 1, false);
+          return;
+        }
+
+        var seg = clamp(Math.floor(elapsed / SEG_MS), 0, frames.length - 2);
+        var u = ease(clamp((elapsed - seg * SEG_MS) / SEG_MS, 0, 1));
+        var A = frames[seg];
+        var B = frames[seg + 1];
+
+        for (var i = 0; i < state.length; i++) {
+          state[i].x = A[i].x + (B[i].x - A[i].x) * u;
+          state[i].y = A[i].y + (B[i].y - A[i].y) * u;
+          place(i);
+        }
+
+        if (seg !== shown) { shown = seg; cur = seg; renderStrip(); }
+
+        raf = window.requestAnimationFrame(tick);
+      }
+
+      /* 再生が転んでも、盤面が操作不能なまま固まらないようにする */
+      function tick(now) {
+        try {
+          step(now);
+        } catch (err) {
+          playing = false;
+          setPlayUI(false);
+          showFrame(clamp(cur, 0, frames.length - 1), false);
+          toast("再生を中断しました");
+        }
+      }
+
+      raf = window.requestAnimationFrame(tick);
+    }
+
+    function stop() {
+      if (!playing) return;
+      playing = false;
+      if (raf) window.cancelAnimationFrame(raf);
+      setPlayUI(false);
+      /* 途中で止めたら、いま見えている位置ではなく直前のコマに戻す。
+         中途半端な補間結果をキーフレームに焼き付けないため。 */
+      showFrame(cur, false);
+    }
+
+    playBtn.addEventListener("click", function () {
+      if (playing) { stop(); } else { play(); }
+    });
+
+    /* ---------- リセット（編集中のコマだけを初期配置に戻す） ---------- */
+
+    document.getElementById("reset").addEventListener("click", function () {
+      stop();
+      endDrag();
+
+      nodes.forEach(function (n, i) {
+        n.classList.add("homing");
+        state[i].x = START[i].x;
+        state[i].y = START[i].y;
+        place(i);
+      });
+
+      commit();
+      window.clearTimeout(homingTimer);
+      homingTimer = window.setTimeout(clearHoming, 480);
+    });
+
+    /* ---------- ファイルの受け渡し ---------- */
+
+    function anchorFallback(filename, data) {
+      try {
+        var blob = (typeof Blob !== "undefined" && data instanceof Blob)
+          ? data : new Blob([data], { type: "application/octet-stream" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        return "saved";
+      } catch (e) {
+        toast("保存できませんでした");
+        return "error";
+      }
+    }
+
+    /* 閲覧側の確認を挟んで保存する。使えない環境ではリンク経由に落とす。 */
+    function offerFile(filename, data) {
+      var dl = window.claude && window.claude.downloads;
+
+      if (dl && dl.save) {
+        return dl.save({ filename: filename, data: data }).then(function () {
+          return "saved";
+        }, function (err) {
+          var code = err && err.code;
+          if (code === "declined") return "declined";
+          if (code === "too_large") { toast("ファイルが大きすぎて保存できません"); return "error"; }
+          if (code === "rate_limited") { toast("少し待ってから、もう一度お試しください"); return "error"; }
+          return anchorFallback(filename, data);
+        });
+      }
+
+      return Promise.resolve(anchorFallback(filename, data));
+    }
+
+    /* ---------- PNG 書き出し ---------- */
+
+    function stamp() {
+      var d = new Date();
+      var p = function (n) { return n < 10 ? "0" + n : String(n); };
+      return d.getFullYear() + "." + p(d.getMonth() + 1) + "." + p(d.getDate());
+    }
+
+    function snapshot() {
+      /* 画面のSVGを複製し、書き出し用に整える。
+         CSS transform は画像化の際に無視される実装があるため、
+         SVGのtransform属性へ確実に焼き込む。 */
+      var clone = court.cloneNode(true);
+      var scale = EXPORT_W / VB.w;
+      var svgH = Math.round(VB.h * scale);
+
+      clone.setAttribute("xmlns", SVGNS);
+      clone.setAttribute("width", EXPORT_W);
+      clone.setAttribute("height", svgH);
+
+      Array.prototype.forEach.call(clone.querySelectorAll(".pc"), function (g) {
+        var i = +g.getAttribute("data-i");
+        g.classList.remove("enter", "is-grab", "homing");
+        g.removeAttribute("style");
+        g.setAttribute("transform", "translate(" + state[i].x + " " + state[i].y + ")");
+      });
+      Array.prototype.forEach.call(clone.querySelectorAll(".pcb"), function (g) {
+        g.removeAttribute("style");
+      });
+
+      /* 共有画像はテーマに関わらず暗転させない */
+      var dim = clone.querySelector("#dim");
+      if (dim) dim.setAttribute("opacity", "0");
+
+      return { markup: new XMLSerializer().serializeToString(clone), w: EXPORT_W, h: svgH };
+    }
+
+    function renderPNG() {
+      return new Promise(function (resolve, reject) {
+        var snap = snapshot();
+        var img = new Image();
+
+        img.onload = function () {
+          var footer = 96;
+          var c = document.createElement("canvas");
+          c.width = snap.w;
+          c.height = snap.h + footer;
+
+          var g = c.getContext("2d");
+          g.drawImage(img, 0, 0, snap.w, snap.h);
+
+          var mid = snap.h + footer / 2;
+          g.fillStyle = "#17130F";
+          g.fillRect(0, snap.h, snap.w, footer);
+          g.fillStyle = "#E8564A";
+          g.beginPath();
+          g.arc(40, mid, 9, 0, Math.PI * 2);
+          g.fill();
+
+          g.textBaseline = "middle";
+          g.textAlign = "left";
+          g.fillStyle = "#F2ECE3";
+          g.font = '700 34px "Hiragino Kaku Gothic ProN", system-ui, sans-serif';
+          var title = "フットサル作戦盤（半面）";
+          g.fillText(title, 64, mid + 1);
+
+          if (frames.length > 1) {
+            var w = g.measureText(title).width;
+            g.fillStyle = "#A3958A";
+            g.font = '26px "Hiragino Kaku Gothic ProN", system-ui, sans-serif';
+            g.fillText("コマ " + (cur + 1) + " / " + frames.length, 64 + w + 20, mid + 2);
+          }
+
+          g.fillStyle = "#A3958A";
+          g.font = '26px ui-monospace, Menlo, monospace';
+          g.textAlign = "right";
+          g.fillText(stamp(), snap.w - 36, mid + 1);
+
+          try {
+            c.toBlob(function (blob) {
+              if (blob) { resolve(blob); }
+              else { reject(new Error("画像を作成できませんでした。もう一度お試しください")); }
+            }, "image/png");
+          } catch (err) {
+            reject(new Error("この環境では画像を書き出せません"));
+          }
+        };
+
+        img.onerror = function () { reject(new Error("コート図を画像に変換できませんでした")); };
+        img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(snap.markup);
+      });
+    }
+
+    /* ---------- 画像シート ---------- */
+
+    var sheet = document.getElementById("sheet");
+    var shot = document.getElementById("shot");
+    var dlLink = document.getElementById("download");
+    var shareBtn = document.getElementById("share");
+    var saveBtn = document.getElementById("save");
+    var saveLabel = saveBtn.innerHTML;
+
+    var blobURL = null;
+    var pngBlob = null;
+
+    var canShareFiles = !!(navigator.canShare && navigator.share);
+    if (!canShareFiles) {
+      shareBtn.remove();
+      document.getElementById("sheetAct").classList.add("is-single");
+    }
+
+    saveBtn.addEventListener("click", function () {
+      stop();
+      endDrag();
+      saveBtn.disabled = true;
+      saveBtn.textContent = "書き出し中…";
+
+      renderPNG().then(function (blob) {
+        pngBlob = blob;
+        if (blobURL) URL.revokeObjectURL(blobURL);
+        blobURL = URL.createObjectURL(blob);
+        shot.src = blobURL;
+        dlLink.href = blobURL;
+        dlLink.download = "futsal-board-" + stamp().replace(/\./g, "") +
+          (frames.length > 1 ? "-" + (cur + 1) : "") + ".png";
+        sheet.showModal();
+      }).catch(function (err) {
+        toast(err.message);
+      }).then(function () {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = saveLabel;
+      });
+    });
+
+    dlLink.addEventListener("click", function (e) {
+      var dl = window.claude && window.claude.downloads;
+      if (dl && dl.save && pngBlob) {
+        e.preventDefault();
+        offerFile(dlLink.download, pngBlob);
+      }
+      /* 使えない環境では <a download> がそのまま働く */
+    });
+
+    document.getElementById("closeSheet").addEventListener("click", function () { sheet.close(); });
+
+    sheet.addEventListener("close", function () {
+      if (blobURL) { URL.revokeObjectURL(blobURL); blobURL = null; }
+      shot.removeAttribute("src");
+      dlLink.removeAttribute("href");
+      pngBlob = null;
+    });
+
+    if (canShareFiles) {
+      shareBtn.addEventListener("click", function () {
+        if (!pngBlob) return;
+
+        var file = new File([pngBlob], "futsal-board.png", { type: "image/png" });
+        if (!navigator.canShare({ files: [file] })) {
+          toast("この端末では画像を共有できません。ダウンロードをお使いください");
+          return;
+        }
+
+        navigator.share({ files: [file], title: "フットサル作戦盤" }).catch(function (err) {
+          if (err && err.name === "AbortError") return; /* ユーザーが閉じただけ */
+          toast("共有できませんでした。ダウンロードをお使いください");
+        });
+      });
+    }
+
+    /* ---------- 作戦シート（端末内保存） ---------- */
+
+    var playsDlg = document.getElementById("plays");
+    var nameInput = document.getElementById("playName");
+    var plist = document.getElementById("plist");
+    var savePlayBtn = document.getElementById("savePlay");
+    var storeNote = document.getElementById("storeNote");
+    var fileInput = document.getElementById("fileInput");
+
+    function loadPlays() {
+      var raw = LS.get(KEY_PLAYS);
+      if (!raw) return [];
+      try {
+        var d = JSON.parse(raw);
+        if (!Array.isArray(d)) return [];
+        return d.filter(function (p) {
+          return p && typeof p.name === "string" && Array.isArray(p.frames);
+        });
+      } catch (e) { return []; }
+    }
+
+    function writePlays(list) { return LS.set(KEY_PLAYS, JSON.stringify(list)); }
+
+    function fmtDate(ms) {
+      var d = new Date(ms);
+      if (isNaN(d.getTime())) return "";
+      var p = function (n) { return n < 10 ? "0" + n : String(n); };
+      return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) +
+        " " + p(d.getHours()) + ":" + p(d.getMinutes());
+    }
+
+    function renderPlays() {
+      plist.textContent = "";
+      var list = loadPlays();
+
+      if (!list.length) {
+        var empty = document.createElement("p");
+        empty.className = "empty";
+        empty.textContent = LS.ok
+          ? "保存した作戦はまだありません"
+          : "この環境では端末に保存できません";
+        plist.appendChild(empty);
+        return;
+      }
+
+      list.forEach(function (p) {
+        var li = document.createElement("li");
+        li.className = "pitem";
+
+        var t = document.createElement("div");
+        t.className = "pitem__t";
+
+        var n = document.createElement("div");
+        n.className = "pitem__n";
+        n.textContent = p.name;              /* 保存名は必ずテキストとして入れる */
+
+        var pr = parseRoster(p.roster);
+        var m = document.createElement("div");
+        m.className = "pitem__m";
+        m.textContent = "赤" + pr.a + " 対 青" + pr.b + " ・ コマ " + p.frames.length + " ・ " + fmtDate(p.updated);
+
+        t.appendChild(n);
+        t.appendChild(m);
+
+        var open = document.createElement("button");
+        open.type = "button";
+        open.className = "mini";
+        open.textContent = "読込";
+        open.addEventListener("click", function () { applyPlay(p); });
+
+        var del = document.createElement("button");
+        del.type = "button";
+        del.className = "mini mini--quiet";
+        del.textContent = "削除";
+
+        /* 2度押しで確定。iframe内では confirm() が塞がれることがあるため、
+           確認は画面内で完結させる。 */
+        var armed = null;
+        del.addEventListener("click", function () {
+          if (armed) {
+            window.clearTimeout(armed);
+            var rest = loadPlays().filter(function (q) { return q.id !== p.id; });
+            writePlays(rest);
+            renderPlays();
+            toast("「" + p.name + "」を削除しました");
+            return;
+          }
+          del.textContent = "削除する";
+          del.className = "mini mini--danger";
+          armed = window.setTimeout(function () {
+            armed = null;
+            del.textContent = "削除";
+            del.className = "mini mini--quiet";
+          }, 3000);
+        });
+
+        li.appendChild(t);
+        li.appendChild(open);
+        li.appendChild(del);
+        plist.appendChild(li);
+      });
+    }
+
+    function applyPlay(p) {
+      var rec = loadRecord(p);
+      if (!rec) { toast("この作戦は読み込めませんでした"); return; }
+
+      stop();
+      endDrag();
+      roster = rec.roster;
+      START = rec.pieces;
+      mountPieces();
+      frames = rec.frames;
+      showFrame(0, false);
+      syncRosterUI();
+      nameInput.value = p.name;
+      playsDlg.close();
+      toast("「" + p.name + "」を読み込みました");
+    }
+
+    savePlayBtn.addEventListener("click", function () {
+      var name = nameInput.value.trim();
+
+      if (!name) { toast("作戦の名前を入れてください"); nameInput.focus(); return; }
+      if (!LS.ok) { toast("この環境では端末に保存できません。JSON書き出しをお使いください"); return; }
+
+      var list = loadPlays();
+      var hit = -1;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].name === name) { hit = i; break; }
+      }
+
+      if (hit < 0 && list.length >= MAX_PLAYS) {
+        toast("保存できる作戦は " + MAX_PLAYS + " 件までです");
+        return;
+      }
+
+      var rec = {
+        id: hit >= 0 ? list[hit].id : String(Date.now()) + Math.random().toString(36).slice(2, 7),
+        name: name,
+        updated: Date.now(),
+        roster: { a: roster.a, b: roster.b },
+        frames: serializeFrames(frames)
+      };
+
+      if (hit >= 0) { list[hit] = rec; } else { list.unshift(rec); }
+
+      if (!writePlays(list)) {
+        toast("保存できませんでした。端末の空き容量をご確認ください");
+        return;
+      }
+
+      renderPlays();
+      toast(hit >= 0 ? "「" + name + "」を上書きしました" : "「" + name + "」を保存しました");
+    });
+
+    document.getElementById("openPlays").addEventListener("click", function () {
+      stop();
+      storeNote.textContent = LS.ok
+        ? "作戦はこの端末のブラウザに保存されます。別の端末や仲間に渡すときは JSON で書き出してください。"
+        : "この環境ではブラウザ保存が使えません。JSON の書き出し・読み込みはお使いいただけます。";
+      savePlayBtn.disabled = !LS.ok;
+      renderPlays();
+      playsDlg.showModal();
+    });
+
+    document.getElementById("closePlays").addEventListener("click", function () { playsDlg.close(); });
+
+    /* ---------- 人数シート ---------- */
+
+    var rosterDlg = document.getElementById("roster");
+    var nAEl = document.getElementById("nA");
+    var nBEl = document.getElementById("nB");
+    var stepBtns = Array.prototype.slice.call(rosterDlg.querySelectorAll(".step"));
+
+    function syncRosterUI() {
+      nAEl.textContent = String(roster.a);
+      nBEl.textContent = String(roster.b);
+
+      stepBtns.forEach(function (btn) {
+        var n = roster[btn.getAttribute("data-team")];
+        var d = +btn.getAttribute("data-d");
+        btn.disabled = (d < 0 && n <= MIN_TEAM) || (d > 0 && n >= MAX_TEAM);
+      });
+    }
+
+    stepBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var team = btn.getAttribute("data-team");
+        var d = +btn.getAttribute("data-d");
+        setRoster(
+          team === "a" ? roster.a + d : roster.a,
+          team === "b" ? roster.b + d : roster.b,
+          true
+        );
+      });
+    });
+
+    document.getElementById("rosterReset").addEventListener("click", function () {
+      setRoster(roster.a, roster.b, false);
+      toast("赤" + roster.a + " 対 青" + roster.b + " で配置をやり直しました");
+    });
+
+    document.getElementById("openRoster").addEventListener("click", function () {
+      stop();
+      syncRosterUI();
+      rosterDlg.showModal();
+    });
+
+    document.getElementById("closeRoster").addEventListener("click", function () { rosterDlg.close(); });
+
+    /* ---------- JSON の書き出し・読み込み ---------- */
+
+    document.getElementById("exportJSON").addEventListener("click", function () {
+      var name = nameInput.value.trim() || "作戦";
+      var text = JSON.stringify({
+        app: "futsal-board",
+        version: 2,
+        court: "half",
+        name: name,
+        savedAt: new Date().toISOString(),
+        roster: { a: roster.a, b: roster.b },
+        frames: serializeFrames(frames)
+      }, null, 2);
+
+      offerFile("futsal-board-" + stamp().replace(/\./g, "") + ".json", text)
+        .then(function (r) { if (r === "saved") toast("JSONを書き出しました"); });
+    });
+
+    document.getElementById("importJSON").addEventListener("click", function () {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", function () {
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+
+      var done = function (msg) { if (msg) toast(msg); fileInput.value = ""; };
+
+      if (f.size > 2 * 1024 * 1024) { done("ファイルが大きすぎます"); return; }
+
+      var rd = new FileReader();
+
+      rd.onload = function () {
+        var parsed;
+        try { parsed = JSON.parse(String(rd.result)); }
+        catch (e) { done("JSONとして読めませんでした"); return; }
+
+        if (!parsed || parsed.court !== "half") {
+          done("全面の作戦盤のファイルです。この半面版では読み込めません");
+          return;
+        }
+
+        var rec = loadRecord(parsed);
+        if (!rec) { done("この作戦盤のファイルではないようです"); return; }
+
+        stop();
+        endDrag();
+        roster = rec.roster;
+        START = rec.pieces;
+        mountPieces();
+        frames = rec.frames;
+        showFrame(0, false);
+        syncRosterUI();
+
+        if (parsed.name && typeof parsed.name === "string") {
+          nameInput.value = parsed.name.slice(0, 40);
+        }
+
+        playsDlg.close();
+        done("読み込みました（赤" + rec.roster.a + " 対 青" + rec.roster.b + "・コマ " + rec.frames.length + " 個）");
+      };
+
+      rd.onerror = function () { done("ファイルを読めませんでした"); };
+      rd.readAsText(f);
+    });
+
+    build();
+  })();
+</script>
+</body></html>

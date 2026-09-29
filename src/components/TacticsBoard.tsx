@@ -1,15 +1,17 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Play, Pause, RotateCcw } from "lucide-react";
-import { Tactic, VB, PLAYER_R, BALL_R, SEG_MS, HOLD_MS, positionsAt } from "@/lib/tactics";
+import { Tactic, VBS, PLAYER_R, BALL_R, SEG_MS, HOLD_MS, positionsAt } from "@/lib/tactics";
 
 // 見るだけの作戦盤。コート・床・コマを1枚のSVGで描き、コマ送りを補間して自動で繰り返し再生する。
 // 座標は作戦盤と同じ実寸メートルなので、変換なしでそのまま描ける。
 
-const BOARD_WIDTH = "min(100%, calc(70vh * 23.2 / 44.4))";
-
 const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
   const uid = useId().replace(/:/g, "");
-  const { frames, pieces } = tactic;
+  const { frames, pieces, court } = tactic;
+  const VB = VBS[court];
+  const half = court === "half";
+  // 縦向きの全面は高さで、横向きの半面は幅で収める
+  const BOARD_WIDTH = `min(100%, calc(${half ? 72 : 70}vh * ${VB.w} / ${VB.h}))`;
   const total = (frames.length - 1) * SEG_MS;
   const canPlay = frames.length > 1;
 
@@ -70,7 +72,7 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
     <div className="w-full">
       <div
         className="mx-auto rounded-xl overflow-hidden border border-border shadow-sm"
-        style={{ width: BOARD_WIDTH, aspectRatio: "23.2 / 44.4" }}
+        style={{ width: BOARD_WIDTH, aspectRatio: `${VB.w} / ${VB.h}` }}
       >
         <svg
           viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`}
@@ -79,12 +81,12 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
           aria-label={`${tactic.name}のコート図。コマ ${shown + 1} / ${frames.length}`}
         >
           <defs>
-            <linearGradient id={id("wood")} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={id("wood")} x1="0" y1="0" x2={half ? "1" : "0"} y2={half ? "0" : "1"}>
               <stop offset="0" stopColor="#EFE0C8" />
               <stop offset="0.54" stopColor="#E6D3B6" />
               <stop offset="1" stopColor="#DCC6A4" />
             </linearGradient>
-            <radialGradient id={id("gym")} cx="0.5" cy="0.1" r="0.75">
+            <radialGradient id={id("gym")} cx={half ? "0.1" : "0.5"} cy={half ? "0.5" : "0.1"} r="0.75">
               <stop offset="0" stopColor="#FFF6E0" stopOpacity="0.1" />
               <stop offset="1" stopColor="#FFF6E0" stopOpacity="0" />
             </radialGradient>
@@ -112,30 +114,54 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
           <rect x={VB.x} y={VB.y} width={VB.w} height={VB.h} fill={`url(#${id("wood")})`} />
           <rect x={VB.x} y={VB.y} width={VB.w} height={VB.h} fill={`url(#${id("gym")})`} />
 
-          {/* ゴールネット */}
-          <rect x="8.5" y="-1.1" width="3" height="1.1" fill={`url(#${id("net")})`} />
-          <rect x="8.5" y="40" width="3" height="1.1" fill={`url(#${id("net")})`} />
+          {half ? (
+            <>
+              {/* ゴールネット（左） */}
+              <rect x="-1.1" y="8.5" width="1.1" height="3" fill={`url(#${id("net")})`} />
+              <g fill="none" stroke="#FFFFFF" strokeWidth="0.24" strokeLinecap="round">
+                <path d="M0 8.5H-1.1V11.5H0" strokeWidth="0.28" />
+                <path d="M20 0H0V20H20" />
+                <path d="M20 0V20" />
+                <path d="M20 7A3 3 0 0 0 17 10A3 3 0 0 0 20 13" />
+                <path d="M0 2.5A6 6 0 0 1 6 8.5L6 11.5A6 6 0 0 1 0 17.5" />
+                <path d="M0.25 0A0.25 0.25 0 0 1 0 0.25" />
+                <path d="M0 19.75A0.25 0.25 0 0 1 0.25 20" />
+                <path d="M10 0V-0.8M15 0V-0.8" strokeWidth="0.22" />
+              </g>
+              <g fill="#FFFFFF">
+                {[6, 10, 20].map((x) => (
+                  <circle key={x} cx={x} cy="10" r="0.15" />
+                ))}
+              </g>
+            </>
+          ) : (
+            <>
+              {/* ゴールネット */}
+              <rect x="8.5" y="-1.1" width="3" height="1.1" fill={`url(#${id("net")})`} />
+              <rect x="8.5" y="40" width="3" height="1.1" fill={`url(#${id("net")})`} />
 
-          {/* ライン（実寸: コート 20m × 40m） */}
-          <g fill="none" stroke="#FFFFFF" strokeWidth="0.24" strokeLinecap="round">
-            <path d="M8.5 0V-1.1H11.5V0" strokeWidth="0.28" />
-            <path d="M8.5 40V41.1H11.5V40" strokeWidth="0.28" />
-            <rect x="0" y="0" width="20" height="40" />
-            <path d="M0 20H20" />
-            <circle cx="10" cy="20" r="3" />
-            <path d="M2.5 0 A6 6 0 0 0 8.5 6 L11.5 6 A6 6 0 0 0 17.5 0" />
-            <path d="M2.5 40 A6 6 0 0 1 8.5 34 L11.5 34 A6 6 0 0 1 17.5 40" />
-            <path d="M0 0.25A0.25 0.25 0 0 0 0.25 0" />
-            <path d="M19.75 0A0.25 0.25 0 0 0 20 0.25" />
-            <path d="M20 39.75A0.25 0.25 0 0 0 19.75 40" />
-            <path d="M0.25 40A0.25 0.25 0 0 0 0 39.75" />
-            <path d="M0 10H-0.8M0 15H-0.8M0 25H-0.8M0 30H-0.8" strokeWidth="0.22" />
-          </g>
-          <g fill="#FFFFFF">
-            {[6, 34, 10, 30, 20].map((y) => (
-              <circle key={y} cx="10" cy={y} r="0.15" />
-            ))}
-          </g>
+              {/* ライン（実寸: コート 20m × 40m） */}
+              <g fill="none" stroke="#FFFFFF" strokeWidth="0.24" strokeLinecap="round">
+                <path d="M8.5 0V-1.1H11.5V0" strokeWidth="0.28" />
+                <path d="M8.5 40V41.1H11.5V40" strokeWidth="0.28" />
+                <rect x="0" y="0" width="20" height="40" />
+                <path d="M0 20H20" />
+                <circle cx="10" cy="20" r="3" />
+                <path d="M2.5 0 A6 6 0 0 0 8.5 6 L11.5 6 A6 6 0 0 0 17.5 0" />
+                <path d="M2.5 40 A6 6 0 0 1 8.5 34 L11.5 34 A6 6 0 0 1 17.5 40" />
+                <path d="M0 0.25A0.25 0.25 0 0 0 0.25 0" />
+                <path d="M19.75 0A0.25 0.25 0 0 0 20 0.25" />
+                <path d="M20 39.75A0.25 0.25 0 0 0 19.75 40" />
+                <path d="M0.25 40A0.25 0.25 0 0 0 0 39.75" />
+                <path d="M0 10H-0.8M0 15H-0.8M0 25H-0.8M0 30H-0.8" strokeWidth="0.22" />
+              </g>
+              <g fill="#FFFFFF">
+                {[6, 34, 10, 30, 20].map((y) => (
+                  <circle key={y} cx="10" cy={y} r="0.15" />
+                ))}
+              </g>
+            </>
+          )}
 
           {/* コマ */}
           {pieces.map((p, i) => {

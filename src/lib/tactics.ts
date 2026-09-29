@@ -1,7 +1,14 @@
 // 作戦盤（フットサル作戦盤）が書き出すJSONを、サイトで再生するための読み込み処理。
 // 座標は作戦盤と同じく実寸メートル。コマの並びは 青1..N → 赤1..N → ボール。
 
-export const VB = { x: -1.6, y: -2.2, w: 23.2, h: 44.4 };
+// full = 全面（縦向き 20×40m）／ half = 半面（横向き。左がゴール、20×20m + 余白）
+export type Court = "full" | "half";
+
+export const VBS = {
+  full: { x: -1.6, y: -2.2, w: 23.2, h: 44.4 },
+  half: { x: -2.2, y: -1.6, w: 28, h: 23.2 },
+} as const;
+
 export const PLAYER_R = 1.3;
 export const BALL_R = 0.85;
 export const SEG_MS = 900; // コマ間の再生時間（作戦盤と同じ）
@@ -14,6 +21,7 @@ export interface Piece {
 
 export interface Tactic {
   id: string;
+  court: Court;
   name: string;
   note?: string;
   roster: { a: number; b: number };
@@ -35,6 +43,8 @@ const team = (v: unknown) => (isNum(v) ? clamp(Math.floor(v), 1, 15) : 5);
 export const parseTactic = (id: string, raw: any): Tactic | null => {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.frames) || raw.frames.length < 1) return null;
 
+  const court: Court = raw.court === "half" ? "half" : "full";
+  const vb = VBS[court];
   const a = team(raw.roster?.a);
   const b = team(raw.roster?.b);
   const pieces = buildPieces(a, b);
@@ -50,8 +60,8 @@ export const parseTactic = (id: string, raw: any): Tactic | null => {
       if (!isNum(x) || !isNum(y)) return null;
       const r = pieces[j].t === "ball" ? BALL_R : PLAYER_R;
       frame.push({
-        x: clamp(x, VB.x + r, VB.x + VB.w - r),
-        y: clamp(y, VB.y + r, VB.y + VB.h - r),
+        x: clamp(x, vb.x + r, vb.x + vb.w - r),
+        y: clamp(y, vb.y + r, vb.y + vb.h - r),
       });
     }
     frames.push(frame);
@@ -59,6 +69,7 @@ export const parseTactic = (id: string, raw: any): Tactic | null => {
 
   return {
     id,
+    court,
     name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 40) : "作戦",
     note: typeof raw.note === "string" ? raw.note : undefined,
     roster: { a, b },
