@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Play, Pause, RotateCcw } from "lucide-react";
-import { Tactic, VBS, PLAYER_R, BALL_R, SEG_MS, HOLD_MS, positionsAt } from "@/lib/tactics";
+import { Tactic, VBS, RADII, SEG_MS, HOLD_MS, positionsAt } from "@/lib/tactics";
 
 // 見るだけの作戦盤。コート・床・コマを1枚のSVGで描き、コマ送りを補間して自動で繰り返し再生する。
 // 座標は作戦盤と同じ実寸メートルなので、変換なしでそのまま描ける。
@@ -10,8 +10,7 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
   const { frames, pieces, court } = tactic;
   const VB = VBS[court];
   const half = court === "half";
-  // 縦向きの全面は高さで、横向きの半面は幅で収める
-  const BOARD_WIDTH = `min(100%, calc(${half ? 72 : 70}vh * ${VB.w} / ${VB.h}))`;
+  const BOARD_WIDTH = `min(100%, calc(70vh * ${VB.w} / ${VB.h}))`;
   const total = (frames.length - 1) * SEG_MS;
   const canPlay = frames.length > 1;
 
@@ -81,12 +80,12 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
           aria-label={`${tactic.name}のコート図。コマ ${shown + 1} / ${frames.length}`}
         >
           <defs>
-            <linearGradient id={id("wood")} x1="0" y1="0" x2={half ? "1" : "0"} y2={half ? "0" : "1"}>
+            <linearGradient id={id("wood")} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="#EFE0C8" />
               <stop offset="0.54" stopColor="#E6D3B6" />
               <stop offset="1" stopColor="#DCC6A4" />
             </linearGradient>
-            <radialGradient id={id("gym")} cx={half ? "0.1" : "0.5"} cy={half ? "0.5" : "0.1"} r="0.75">
+            <radialGradient id={id("gym")} cx="0.5" cy="0.1" r="0.75">
               <stop offset="0" stopColor="#FFF6E0" stopOpacity="0.1" />
               <stop offset="1" stopColor="#FFF6E0" stopOpacity="0" />
             </radialGradient>
@@ -116,21 +115,21 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
 
           {half ? (
             <>
-              {/* ゴールネット（左） */}
-              <rect x="-1.1" y="8.5" width="1.1" height="3" fill={`url(#${id("net")})`} />
+              {/* ゴールネット（上） */}
+              <rect x="8.5" y="-1.1" width="3" height="1.1" fill={`url(#${id("net")})`} />
               <g fill="none" stroke="#FFFFFF" strokeWidth="0.24" strokeLinecap="round">
-                <path d="M0 8.5H-1.1V11.5H0" strokeWidth="0.28" />
-                <path d="M20 0H0V20H20" />
-                <path d="M20 0V20" />
-                <path d="M20 7A3 3 0 0 0 17 10A3 3 0 0 0 20 13" />
-                <path d="M0 2.5A6 6 0 0 1 6 8.5L6 11.5A6 6 0 0 1 0 17.5" />
-                <path d="M0.25 0A0.25 0.25 0 0 1 0 0.25" />
-                <path d="M0 19.75A0.25 0.25 0 0 1 0.25 20" />
-                <path d="M10 0V-0.8M15 0V-0.8" strokeWidth="0.22" />
+                <path d="M8.5 0V-1.1H11.5V0" strokeWidth="0.28" />
+                <path d="M0 20V0H20V20" />
+                <path d="M0 20H20" />
+                <path d="M7 20A3 3 0 0 1 13 20" />
+                <path d="M2.5 0A6 6 0 0 0 8.5 6L11.5 6A6 6 0 0 0 17.5 0" />
+                <path d="M0 0.25A0.25 0.25 0 0 0 0.25 0" />
+                <path d="M19.75 0A0.25 0.25 0 0 0 20 0.25" />
+                <path d="M0 10H-0.8M0 15H-0.8" strokeWidth="0.22" />
               </g>
               <g fill="#FFFFFF">
-                {[6, 10, 20].map((x) => (
-                  <circle key={x} cx={x} cy="10" r="0.15" />
+                {[6, 10, 20].map((y) => (
+                  <circle key={y} cx="10" cy={y} r="0.15" />
                 ))}
               </g>
             </>
@@ -165,7 +164,7 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
 
           {/* コマ */}
           {pieces.map((p, i) => {
-            const r = p.t === "ball" ? BALL_R : PLAYER_R;
+            const r = p.t === "ball" ? RADII[court].ball : RADII[court].player;
             return (
               <g key={i} transform={`translate(${pos[i].x} ${pos[i].y})`}>
                 <circle r={r} fill={fill[p.t]} />
@@ -175,7 +174,7 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
                     dy="0.36em"
                     textAnchor="middle"
                     fill="#fff"
-                    style={{ fontSize: 1.32, fontWeight: 700, pointerEvents: "none" }}
+                    style={{ fontSize: r * 1.015, fontWeight: 700, pointerEvents: "none" }}
                   >
                     {p.n}
                   </text>

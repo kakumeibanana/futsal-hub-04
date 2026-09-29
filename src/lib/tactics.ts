@@ -1,16 +1,19 @@
 // 作戦盤（フットサル作戦盤）が書き出すJSONを、サイトで再生するための読み込み処理。
 // 座標は作戦盤と同じく実寸メートル。コマの並びは 青1..N → 赤1..N → ボール。
 
-// full = 全面（縦向き 20×40m）／ half = 半面（横向き。左がゴール、20×20m + 余白）
+// full = 全面（縦向き 20×40m）／ half = 半面（ゴールが上。20×20m + 余白）
 export type Court = "full" | "half";
 
 export const VBS = {
   full: { x: -1.6, y: -2.2, w: 23.2, h: 44.4 },
-  half: { x: -2.2, y: -1.6, w: 28, h: 23.2 },
+  half: { x: -1.6, y: -2.2, w: 23.2, h: 28 },
 } as const;
 
-export const PLAYER_R = 1.3;
-export const BALL_R = 0.85;
+// コマの実寸半径。半面は盤が大きく映るので、全面版と画面上の大きさが揃うよう小さくする
+export const RADII = {
+  full: { player: 1.3, ball: 0.85 },
+  half: { player: 0.7, ball: 0.45 },
+} as const;
 export const SEG_MS = 900; // コマ間の再生時間（作戦盤と同じ）
 export const HOLD_MS = 1600; // 最後のコマで止めてから頭に戻るまで
 
@@ -58,7 +61,7 @@ export const parseTactic = (id: string, raw: any): Tactic | null => {
       const x = Array.isArray(p) ? p[0] : p?.x;
       const y = Array.isArray(p) ? p[1] : p?.y;
       if (!isNum(x) || !isNum(y)) return null;
-      const r = pieces[j].t === "ball" ? BALL_R : PLAYER_R;
+      const r = pieces[j].t === "ball" ? RADII[court].ball : RADII[court].player;
       frame.push({
         x: clamp(x, vb.x + r, vb.x + vb.w - r),
         y: clamp(y, vb.y + r, vb.y + vb.h - r),
