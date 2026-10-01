@@ -15,8 +15,7 @@ export const RADII = {
   half: { player: 0.7, ball: 0.45 },
 } as const;
 export const SEG_MS = 900; // コマ間の再生時間（作戦盤と同じ）
-export const HOLD_MS = 1600; // 最後のコマで止めてから頭に戻るまで（再生時間の単位。速度に応じて伸び縮みする）
-export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75] as const;
+export const HOLD_MS = 1600; // 最後のコマで止めてから頭に戻るまで（再生時間の単位。再生速度に応じて伸び縮みする）
 
 export interface Piece {
   t: "a" | "b" | "ball";

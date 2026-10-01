@@ -1,9 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Play, Pause, RotateCcw } from "lucide-react";
-import { Tactic, VBS, RADII, SEG_MS, HOLD_MS, SPEEDS, positionsAt } from "@/lib/tactics";
+import { Tactic, VBS, RADII, SEG_MS, HOLD_MS, positionsAt } from "@/lib/tactics";
 
 // 見るだけの作戦盤。コート・床・コマを1枚のSVGで描き、コマ送りを補間して自動で繰り返し再生する。
 // 座標は作戦盤と同じ実寸メートルなので、変換なしでそのまま描ける。
+
+// 再生速度は 0.5倍で固定（部員が動きを追いやすいように）。切り替えは出さない。
+const PLAY_SPEED = 0.5;
 
 const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
   const uid = useId().replace(/:/g, "");
@@ -21,27 +24,6 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
   const [playing, setPlaying] = useState(canPlay && !reduceMotion);
   const clockRef = useRef(0);
 
-  // 再生速度。作戦盤と同じキーで覚えておく（storageが使えない環境でも動く）
-  const [speed, setSpeed] = useState<number>(() => {
-    try {
-      const v = parseFloat(window.localStorage.getItem("futsal-board-speed.v1") ?? "");
-      return (SPEEDS as readonly number[]).includes(v) ? v : 1;
-    } catch {
-      return 1;
-    }
-  });
-  const speedRef = useRef(speed);
-  speedRef.current = speed;
-
-  const chooseSpeed = (v: number) => {
-    setSpeed(v);
-    try {
-      window.localStorage.setItem("futsal-board-speed.v1", String(v));
-    } catch {
-      /* 保存できなくても再生には影響しない */
-    }
-  };
-
   // 作戦を切り替えたら頭から
   useEffect(() => {
     clockRef.current = 0;
@@ -51,14 +33,14 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
 
   useEffect(() => {
     if (!playing || !canPlay) return;
-    // 時計は「前のtickからの経過 × 速度」を足していく。速度を途中で変えても飛ばない。
+    // 時計は「前のtickからの経過 × 速度」を足していく。
     // 基準は最初のtickのタイムスタンプから取る（rAFの時刻は直前のperformance.now()より過去になりうる）
     let last: number | null = null;
     let raf = 0;
     let c = clockRef.current;
     const tick = (now: number) => {
       if (last === null) last = now;
-      c += Math.max(0, now - last) * speedRef.current;
+      c += Math.max(0, now - last) * PLAY_SPEED;
       last = now;
       if (c >= total + HOLD_MS) c = 0;
       clockRef.current = c;
@@ -253,30 +235,6 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
                 }`}
               >
                 {i + 1}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {canPlay && (
-        <div className="mx-auto mt-3" style={{ width: BOARD_WIDTH }}>
-          <div className="text-[11px] font-bold text-muted-foreground mb-1">再生速度（倍）</div>
-          <div className="grid grid-cols-7 gap-1.5">
-            {SPEEDS.map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => chooseSpeed(v)}
-                aria-pressed={v === speed}
-                aria-label={`再生速度 ${v} 倍`}
-                className={`h-8 rounded-lg border text-xs font-bold tabular-nums transition-colors ${
-                  v === speed
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : "bg-muted border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {v}
               </button>
             ))}
           </div>
