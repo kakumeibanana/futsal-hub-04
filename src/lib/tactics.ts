@@ -32,6 +32,7 @@ const parseNames = (raw: any): { a: string[]; b: string[] } => {
 
 export interface Tactic {
   id: string;
+  category: string; // フォルダ名（無ければ「その他」）
   court: Court;
   name: string;
   note?: string;
@@ -53,7 +54,7 @@ const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi 
 const team = (v: unknown) => (isNum(v) ? clamp(Math.floor(v), 1, 15) : 5);
 
 // 形が合わないファイルは黙って落とさず null を返す（呼び出し側で警告する）
-export const parseTactic = (id: string, raw: any): Tactic | null => {
+export const parseTactic = (id: string, raw: any, category = "その他"): Tactic | null => {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.frames) || raw.frames.length < 1) return null;
 
   const court: Court = raw.court === "half" ? "half" : "full";
@@ -82,6 +83,7 @@ export const parseTactic = (id: string, raw: any): Tactic | null => {
 
   return {
     id,
+    category,
     court,
     name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 40) : "作戦",
     note: typeof raw.note === "string" ? raw.note : undefined,
@@ -93,17 +95,50 @@ export const parseTactic = (id: string, raw: any): Tactic | null => {
   };
 };
 
-// src/data/tactics/*.json をファイル名順に読む。ファイルを置くだけで増える。
-const modules = import.meta.glob("../data/tactics/*.json", { eager: true, import: "default" });
+// src/data/tactics/ の下のJSONを読む。ファイルを置くだけで増える。
+// フォルダがカテゴリになる（例: tactics/コーナー/右コーナー(オーサワ1番).json → カテゴリ「コーナー」）。
+// フォルダに入れなかったJSONは「その他」。
+// フォルダ名・ファイル名の頭に数字を付けると、その順に並ぶ（例: 1_コーナー, 2_キックイン。表示では数字を外す）。
+const modules = import.meta.glob("../data/tactics/**/*.json", { eager: true, import: "default" });
 
-export const tactics: Tactic[] = Object.entries(modules)
-  .sort(([p], [q]) => p.localeCompare(q))
-  .flatMap(([path, raw]) => {
-    const id = path.split("/").pop()!.replace(/\.json$/, "");
-    const t = parseTactic(id, raw);
-    if (!t) console.warn(`[tactics] ${id}.json は作戦盤の形式として読めませんでした`);
-    return t ? [t] : [];
-  });
+export const OTHER_CATEGORY = "その他";
+const ROOT = "../data/tactics/";
+const stripOrder = (s: string) => s.replace(/^\d+[_＿\-.．\s]+/, "");
+const natural = (a: string, b: string) => a.localeCompare(b, "ja", { numeric: true });
+
+export interface TacticCategory {
+  name: string;
+  tactics: Tactic[];
+}
+
+const loaded = Object.entries(modules).flatMap(([path, raw]) => {
+  const rel = path.startsWith(ROOT) ? path.slice(ROOT.length) : path;
+  const parts = rel.split("/");
+  const file = parts[parts.length - 1].replace(/\.json$/, "");
+  const folder = parts.length > 1 ? parts[0] : null;
+  const category = folder ? stripOrder(folder) : OTHER_CATEGORY;
+  const t = parseTactic(rel.replace(/\.json$/, ""), raw, category);
+  if (!t) console.warn(`[tactics] ${rel} は作戦盤の形式として読めませんでした`);
+  return t ? [{ t, folder, file }] : [];
+});
+
+// カテゴリはフォルダ名の順（「その他」は最後）。カテゴリの中はファイル名の順（1番,2番,10番 の自然順）。
+export const categories: TacticCategory[] = (() => {
+  const byFolder = new Map<string, { name: string; items: typeof loaded }>();
+  for (const it of loaded) {
+    const key = it.folder ?? "￿"; // 「その他」を最後にする
+    if (!byFolder.has(key)) byFolder.set(key, { name: it.t.category, items: [] });
+    byFolder.get(key)!.items.push(it);
+  }
+  return [...byFolder.entries()]
+    .sort(([a], [b]) => natural(a, b))
+    .map(([, g]) => ({
+      name: g.name,
+      tactics: g.items.sort((x, y) => natural(x.file, y.file)).map((x) => x.t),
+    }));
+})();
+
+export const tactics: Tactic[] = categories.flatMap((c) => c.tactics);
 
 // 作戦盤と同じイーズ（cubic in-out）
 export const ease = (u: number) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
