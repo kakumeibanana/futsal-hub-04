@@ -39,9 +39,86 @@ export interface Tactic {
   roster: { a: number; b: number };
   names: { a: string[]; b: string[] };
   nameScale: number; // 名前の文字の大きさの倍率（作戦盤で調整した値）
+  balloons: Balloon[][]; // コマごとのふきだし。frames と同じ数・同じ並び
   pieces: Piece[];
   frames: { x: number; y: number }[][];
 }
+
+// 盤の上に置く書き込み。位置は盤の座標（メートル）。そのコマが表示されているときだけ出す。
+export interface Balloon {
+  x: number;
+  y: number;
+  t: string;
+}
+
+export const BALLOON_MAX_TEXT = 30;
+export const BALLOON_MAX_PER_FRAME = 8; // 作戦盤では5個まで。読む側は少し余裕を持つ
+
+// 文字の大きさ（m）。作戦盤の BL_FS と同じ値にして、同じ見た目にする
+export const balloonFontSize = (court: Court) => (court === "half" ? 0.78 : 1.1);
+
+const charW = (ch: string, fs: number) => (ch.charCodeAt(0) >= 0x2e80 ? fs : fs * 0.6);
+const lineW = (l: string, fs: number) => {
+  let w = 0;
+  for (let k = 0; k < l.length; k++) w += charW(l.charAt(k), fs);
+  return w;
+};
+
+// ふきだしの形と位置を決める。作戦盤の drawBalloons と同じ計算（折り返し・端の逃がし・上下の出し分け）
+export const layoutBalloon = (b: Balloon, vb: { x: number; y: number; w: number; h: number }, fs: number) => {
+  const maxLine = fs * 11;
+  const lines: string[] = [];
+  let line = "";
+  let w0 = 0;
+  for (let k = 0; k < b.t.length; k++) {
+    const ch = b.t.charAt(k);
+    const cw = charW(ch, fs);
+    if (w0 + cw > maxLine && line) {
+      lines.push(line);
+      line = "";
+      w0 = 0;
+    }
+    line += ch;
+    w0 += cw;
+  }
+  if (line) lines.push(line);
+
+  const tw = Math.max(0, ...lines.map((l) => lineW(l, fs)));
+  const padX = fs * 0.55;
+  const padY = fs * 0.4;
+  const lh = fs * 1.3;
+  const tail = fs * 0.95;
+  const sw = fs * 0.1;
+  const w = tw + padX * 2;
+  const h = lines.length * lh + padY * 2;
+
+  const bx = Math.min(Math.max(b.x - w / 2, vb.x + 0.2), vb.x + vb.w - w - 0.2);
+  const above = b.y - tail - h >= vb.y + 0.2; // 上に出す。入らなければ下
+  const by = above ? b.y - tail - h : b.y + tail;
+  const baseY = above ? by + h : by;
+  const tx1 = Math.min(Math.max(b.x - fs * 0.45, bx + fs * 0.5), bx + w - fs * 1.4);
+  const tx2 = tx1 + fs * 0.9;
+
+  return { lines, bx, by, w, h, padY, lh, sw, baseY, tx1, tx2, tailPoints: `${tx1},${baseY} ${tx2},${baseY} ${b.x},${b.y}` };
+};
+
+// 外から来たデータは形と値域を検査してから通す。frames と同じ数にそろえる（足りなければ空）
+const parseBalloons = (raw: any, n: number, vb: { x: number; y: number; w: number; h: number }): Balloon[][] =>
+  Array.from({ length: n }, (_, i) => {
+    const src: any[] = Array.isArray(raw?.[i]) ? raw[i] : [];
+    return src.slice(0, BALLOON_MAX_PER_FRAME).flatMap((b): Balloon[] =>
+      typeof b?.x === "number" && typeof b?.y === "number" && Number.isFinite(b.x) && Number.isFinite(b.y) &&
+      typeof b?.t === "string" && b.t.trim()
+        ? [
+            {
+              x: Math.min(Math.max(b.x, vb.x), vb.x + vb.w),
+              y: Math.min(Math.max(b.y, vb.y), vb.y + vb.h),
+              t: b.t.trim().slice(0, BALLOON_MAX_TEXT),
+            },
+          ]
+        : [],
+    );
+  });
 
 export const buildPieces = (a: number, b: number): Piece[] => [
   ...Array.from({ length: b }, (_, i): Piece => ({ t: "b", n: i + 1 })),
@@ -89,6 +166,7 @@ export const parseTactic = (id: string, raw: any, category = "その他"): Tacti
     note: typeof raw.note === "string" ? raw.note : undefined,
     roster: { a, b },
     names: parseNames(raw.names),
+    balloons: parseBalloons(raw.balloons, frames.length, vb),
     nameScale: isNum(raw.nameScale) ? Math.round(clamp(raw.nameScale, 0.5, 1.5) * 10) / 10 : 1,
     pieces,
     frames,

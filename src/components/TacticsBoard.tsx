@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Play, Pause, RotateCcw } from "lucide-react";
-import { Tactic, VBS, RADII, SEG_MS, HOLD_MS, positionsAt } from "@/lib/tactics";
+import { Tactic, VBS, RADII, SEG_MS, HOLD_MS, positionsAt, balloonFontSize, layoutBalloon } from "@/lib/tactics";
 
 // 見るだけの作戦盤。コート・床・コマを1枚のSVGで描き、コマ送りを補間して自動で繰り返し再生する。
 // 座標は作戦盤と同じ実寸メートルなので、変換なしでそのまま描ける。
@@ -198,6 +198,26 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
                     {tactic.names[p.t][p.n! - 1]}
                   </text>
                 )}
+              </g>
+            );
+          })}
+
+          {/* ふきだし。表示しているコマのぶんだけ出す（作戦盤の書き込み） */}
+          {(tactic.balloons[shown] ?? []).map((b, i) => {
+            const bfs = balloonFontSize(court);
+            const L = layoutBalloon(b, VB, bfs);
+            return (
+              <g key={`${shown}-${i}`} style={{ pointerEvents: "none" }}>
+                <polygon points={L.tailPoints} fill="#FFF3C4" stroke="#BA7517" strokeWidth={L.sw} strokeLinejoin="round" />
+                <rect x={L.bx} y={L.by} width={L.w} height={L.h} rx={bfs * 0.35} fill="#FFF3C4" stroke="#BA7517" strokeWidth={L.sw} />
+                <line x1={L.tx1 + L.sw} y1={L.baseY} x2={L.tx2 - L.sw} y2={L.baseY} stroke="#FFF3C4" strokeWidth={L.sw * 1.6} />
+                <text textAnchor="middle" fill="#412402" fontSize={bfs} fontWeight={700}>
+                  {L.lines.map((l, k) => (
+                    <tspan key={k} x={L.bx + L.w / 2} y={L.by + L.padY + L.lh * (k + 0.5)} dy="0.36em">
+                      {l}
+                    </tspan>
+                  ))}
+                </text>
               </g>
             );
           })}
