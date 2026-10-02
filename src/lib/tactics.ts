@@ -46,18 +46,30 @@ export interface Tactic {
   frames: { x: number; y: number }[][];
 }
 
-// 盤の上に置く書き込み。位置は盤の座標（メートル）。そのコマが表示されているときだけ出す。
+// 盤の上に置く書き込み。角が少し丸い、透けた紫の四角（文字入り）。
+// x, y は左上、w, h は大きさ（どれも盤の座標＝メートル）。そのコマが表示されているときだけ出す。
+// 作戦盤の blFit / blWrap / blLegacy と同じ計算にして、同じ見た目にする。
 export interface Balloon {
   x: number;
   y: number;
+  w: number;
+  h: number;
   t: string;
 }
 
 export const BALLOON_MAX_TEXT = 30;
 export const BALLOON_MAX_PER_FRAME = 8; // 作戦盤では5個まで。読む側は少し余裕を持つ
+export const BALLOON_FILL = "rgba(124, 58, 237, 0.55)"; // 透けた紫
+export const BALLOON_STROKE = "rgba(91, 33, 182, 0.95)";
+export const BALLOON_HALO = "#3B0764";
 
-// 文字の大きさ（m）。作戦盤の BL_FS と同じ値にして、同じ見た目にする
+// 基準の文字の大きさ（m）。作戦盤の BL_FS と同じ値
 export const balloonFontSize = (court: Court) => (court === "half" ? 0.78 : 1.1);
+
+const balloonMetrics = (court: Court) => {
+  const fs0 = balloonFontSize(court);
+  return { fs0, max: fs0 * 1.6, min: fs0 * 0.45, step: fs0 * 0.04, minW: fs0 * 2.4, minH: fs0 * 1.8, rx: fs0 * 0.3 };
+};
 
 const charW = (ch: string, fs: number) => (ch.charCodeAt(0) >= 0x2e80 ? fs : fs * 0.6);
 const lineW = (l: string, fs: number) => {
@@ -66,61 +78,89 @@ const lineW = (l: string, fs: number) => {
   return w;
 };
 
-// ふきだしの形と位置を決める。作戦盤の drawBalloons と同じ計算（折り返し・端の逃がし・上下の出し分け）
-export const layoutBalloon = (b: Balloon, vb: { x: number; y: number; w: number; h: number }, fs: number) => {
-  const maxLine = fs * 11;
+// 幅（maxW）を超えたら折り返す（小数の誤差は許す）
+const wrapText = (t: string, fs: number, maxW: number) => {
   const lines: string[] = [];
   let line = "";
-  let w0 = 0;
-  for (let k = 0; k < b.t.length; k++) {
-    const ch = b.t.charAt(k);
+  let w = 0;
+  for (let k = 0; k < t.length; k++) {
+    const ch = t.charAt(k);
     const cw = charW(ch, fs);
-    if (w0 + cw > maxLine && line) {
+    if (w + cw > maxW + 1e-6 && line) {
       lines.push(line);
       line = "";
-      w0 = 0;
+      w = 0;
     }
     line += ch;
-    w0 += cw;
+    w += cw;
   }
   if (line) lines.push(line);
+  return lines;
+};
 
+// 枠（w × h）に収まる、いちばん大きい文字の大きさを探す。入らなければ最小の大きさ
+export const fitBalloon = (t: string, w: number, h: number, court: Court) => {
+  const c = balloonMetrics(court);
+  let last = { fs: c.max, lines: [] as string[] };
+  for (let k = 0; ; k++) {
+    const fs = c.max - k * c.step;
+    if (fs < c.min - 1e-9) break;
+    const lines = wrapText(t, fs, w - fs); // 左右の余白 = fs の半分ずつ
+    const need = lines.length * fs * 1.3 + fs * 0.7; // 上下の余白 = fs の 0.35 ずつ
+    last = { fs, lines };
+    if (need <= h + 1e-6) return last;
+  }
+  return last;
+};
+
+type VBox = { x: number; y: number; w: number; h: number };
+const clampN = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+
+// 古い形式（しっぽの先の位置 x,y だけ。大きさが無い）を、枠に直す
+const legacyBox = (b: { x: number; y: number; t: string }, vb: VBox, court: Court) => {
+  const fs = balloonFontSize(court);
+  const lines = wrapText(b.t, fs, fs * 11);
   const tw = Math.max(0, ...lines.map((l) => lineW(l, fs)));
-  const padX = fs * 0.55;
-  const padY = fs * 0.4;
-  const lh = fs * 1.3;
+  const w = tw + fs * 1.1;
+  const h = lines.length * fs * 1.3 + fs * 0.8;
   const tail = fs * 0.95;
-  const sw = fs * 0.1;
-  const w = tw + padX * 2;
-  const h = lines.length * lh + padY * 2;
-
-  const bx = Math.min(Math.max(b.x - w / 2, vb.x + 0.2), vb.x + vb.w - w - 0.2);
-  const above = b.y - tail - h >= vb.y + 0.2; // 上に出す。入らなければ下
-  const by = above ? b.y - tail - h : b.y + tail;
-  const baseY = above ? by + h : by;
-  const tx1 = Math.min(Math.max(b.x - fs * 0.45, bx + fs * 0.5), bx + w - fs * 1.4);
-  const tx2 = tx1 + fs * 0.9;
-
-  return { lines, bx, by, w, h, padY, lh, sw, baseY, tx1, tx2, tailPoints: `${tx1},${baseY} ${tx2},${baseY} ${b.x},${b.y}` };
+  const bx = clampN(b.x - w / 2, vb.x + 0.2, vb.x + vb.w - w - 0.2);
+  const above = b.y - tail - h >= vb.y + 0.2;
+  return { x: bx, y: above ? b.y - tail - h : b.y + tail, w, h };
 };
 
 // 外から来たデータは形と値域を検査してから通す。frames と同じ数にそろえる（足りなければ空）
-const parseBalloons = (raw: any, n: number, vb: { x: number; y: number; w: number; h: number }): Balloon[][] =>
-  Array.from({ length: n }, (_, i) => {
+const parseBalloons = (raw: any, n: number, vb: VBox, court: Court): Balloon[][] => {
+  const c = balloonMetrics(court);
+  return Array.from({ length: n }, (_, i) => {
     const src: any[] = Array.isArray(raw?.[i]) ? raw[i] : [];
-    return src.slice(0, BALLOON_MAX_PER_FRAME).flatMap((b): Balloon[] =>
-      typeof b?.x === "number" && typeof b?.y === "number" && Number.isFinite(b.x) && Number.isFinite(b.y) &&
-      typeof b?.t === "string" && b.t.trim()
-        ? [
-            {
-              x: Math.min(Math.max(b.x, vb.x), vb.x + vb.w),
-              y: Math.min(Math.max(b.y, vb.y), vb.y + vb.h),
-              t: b.t.trim().slice(0, BALLOON_MAX_TEXT),
-            },
-          ]
-        : [],
-    );
+    const out: Balloon[] = [];
+    for (const b of src.slice(0, BALLOON_MAX_PER_FRAME)) {
+      if (
+        typeof b?.x !== "number" || typeof b?.y !== "number" || !Number.isFinite(b.x) || !Number.isFinite(b.y) ||
+        typeof b?.t !== "string" || !b.t.trim()
+      )
+        continue;
+      const t = b.t.trim().slice(0, BALLOON_MAX_TEXT);
+
+      if (typeof b.w === "number" && typeof b.h === "number" && Number.isFinite(b.w) && Number.isFinite(b.h) && b.w > 0 && b.h > 0) {
+        const w = clampN(b.w, c.minW, vb.w);
+        const h = clampN(b.h, c.minH, vb.h);
+        out.push({ x: clampN(b.x, vb.x, vb.x + vb.w - w), y: clampN(b.y, vb.y, vb.y + vb.h - h), w, h, t });
+      } else {
+        const lg = legacyBox(
+          { x: clampN(b.x, vb.x, vb.x + vb.w), y: clampN(b.y, vb.y, vb.y + vb.h), t },
+          vb,
+          court,
+        );
+        const w = clampN(lg.w, c.minW, vb.w);
+        const h = clampN(lg.h, c.minH, vb.h);
+        out.push({ x: clampN(lg.x, vb.x, vb.x + vb.w - w), y: clampN(lg.y, vb.y, vb.y + vb.h - h), w, h, t });
+      }
+    }
+    return out;
   });
+};
 
 export const buildPieces = (a: number, b: number): Piece[] => [
   ...Array.from({ length: b }, (_, i): Piece => ({ t: "b", n: i + 1 })),
@@ -176,7 +216,7 @@ export const parseTactic = (id: string, raw: any, category = "その他"): Tacti
     note: typeof raw.note === "string" ? raw.note : undefined,
     roster: { a, b },
     names: parseNames(raw.names),
-    balloons: parseBalloons(raw.balloons, frames.length, vb),
+    balloons: parseBalloons(raw.balloons, frames.length, vb, court),
     nameScale: isNum(raw.nameScale) ? Math.round(clamp(raw.nameScale, 0.5, 1.5) * 10) / 10 : 1,
     pieces,
     frames,
