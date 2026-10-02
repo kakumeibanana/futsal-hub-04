@@ -70,10 +70,12 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
   const fill = { a: `url(#${id("magA")})`, b: `url(#${id("magB")})`, ball: `url(#${id("magBall")})` };
 
   return (
-    <div className="w-full">
+    // スマホ・タブレット（lg未満）は、ボードの下にボタンを並べる。
+    // PC（lg以上）は、ボードを左、再生などのボタンを右の帯に置く。
+    <div className="w-full lg:flex lg:items-start lg:justify-start lg:gap-8" style={{ ["--bw" as string]: BOARD_WIDTH }}>
       <div
-        className="mx-auto rounded-xl overflow-hidden border border-border shadow-sm"
-        style={{ width: BOARD_WIDTH, aspectRatio: `${VB.w} / ${VB.h}` }}
+        className="mx-auto lg:mx-0 lg:flex-none w-[var(--bw)] rounded-xl overflow-hidden border border-border shadow-sm"
+        style={{ aspectRatio: `${VB.w} / ${VB.h}` }}
       >
         <svg
           viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`}
@@ -203,24 +205,27 @@ const TacticsBoard = ({ tactic }: { tactic: Tactic }) => {
       </div>
 
       {canPlay && (
-        <div className="mx-auto mt-3 flex items-center gap-2" style={{ width: BOARD_WIDTH }}>
+        <div className="mx-auto mt-3 flex w-[var(--bw)] items-center gap-2 lg:mx-0 lg:mt-0 lg:w-72 lg:flex-wrap">
           <button
             type="button"
             onClick={() => setPlaying((v) => !v)}
-            className="h-10 w-10 flex-none inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:opacity-90"
+            className="h-10 w-10 flex-none inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 lg:w-auto lg:px-4 lg:font-bold"
             aria-label={playing ? "一時停止" : "再生"}
           >
             {playing ? <Pause size={18} /> : <Play size={18} />}
+            <span className="hidden lg:inline text-sm">{playing ? "一時停止" : "再生"}</span>
           </button>
           <button
             type="button"
             onClick={restart}
-            className="h-10 w-10 flex-none inline-flex items-center justify-center rounded-lg border border-border bg-muted text-foreground hover:opacity-90"
+            className="h-10 w-10 flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-muted text-foreground hover:opacity-90 lg:w-auto lg:px-4 lg:font-bold"
             aria-label="最初から"
           >
             <RotateCcw size={16} />
+            <span className="hidden lg:inline text-sm">最初から</span>
           </button>
-          <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto">
+          <div className="hidden lg:block basis-full text-[11px] font-bold text-muted-foreground mt-2">コマ</div>
+          <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto lg:basis-full lg:flex-none lg:flex-wrap lg:overflow-visible">
             {frames.map((_, i) => (
               <button
                 key={i}
