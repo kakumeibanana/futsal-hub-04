@@ -17,10 +17,7 @@ const TacticsPage = () => {
 
   return (
     <div className="container py-8 sm:py-12">
-      <h1 className="font-display font-bold text-2xl sm:text-3xl mb-1">戦術ボード</h1>
-      <p className="text-sm text-muted-foreground mb-6">
-        キャプテンが作った作戦の動きです。赤と青の動きを見て確認してください。
-      </p>
+      <h1 className="font-display font-bold text-2xl sm:text-3xl mb-6">戦術ボード</h1>
 
       {!tactic || !category ? (
         <p className="text-muted-foreground">まだ作戦が登録されていません。</p>
