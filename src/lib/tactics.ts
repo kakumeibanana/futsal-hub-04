@@ -188,6 +188,17 @@ export const parseVideos = (raw: unknown): TacticVideo[] => {
 export const youtubeId = (url: string): string | null =>
   url.match(/(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1] ?? null;
 
+// Google ドライブの共有リンクから、ファイルID（…/file/d/ID/view や open?id=ID）
+export const driveId = (url: string): string | null =>
+  url.match(/drive\.google\.com\/(?:file\/d\/|open\?(?:[^#]*&)?id=)([a-zA-Z0-9_-]+)/)?.[1] ?? null;
+
+// URL の種類。YouTube・ドライブ・それ以外（リンクで開く）
+export type LinkVideoType = "youtube" | "drive" | "link";
+export const detectVideoType = (url: string): LinkVideoType => (youtubeId(url) ? "youtube" : driveId(url) ? "drive" : "link");
+
+// 動画ファイルそのものを指す URL（そのまま <video> で再生できる）
+export const isDirectVideoUrl = (url: string): boolean => /\.(mp4|webm|mov|m4v)(\?[^#]*)?(#.*)?$/i.test(url);
+
 export const buildPieces = (a: number, b: number): Piece[] => [
   ...Array.from({ length: b }, (_, i): Piece => ({ t: "b", n: i + 1 })),
   ...Array.from({ length: a }, (_, i): Piece => ({ t: "a", n: i + 1 })),

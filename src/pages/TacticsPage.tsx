@@ -4,6 +4,7 @@ import { categories, type Tactic } from "@/lib/tactics";
 import TacticsBoard from "@/components/TacticsBoard";
 import TacticVideos from "@/components/TacticVideos";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 // 作戦を作る・試す場所（別のサイト）。誰でも開ける。作戦盤の中身はその人のブラウザの中に保存されるだけで、
 // 開いてもサイトの作戦は変わらない。サイトに載せるときは、書き出したJSONを tactics フォルダに入れる。
@@ -11,6 +12,7 @@ const BOARD_URL = "https://futsal-board-hazel.vercel.app/";
 
 // 作戦が増えても1画面に収まるように、まずカテゴリ（フォルダ）を選び、その中の作戦を選ぶ。
 const TacticsPage = () => {
+  const { isStaff, memberName } = useAuth(); // 動画の追加・削除は、主将・幹部だけ（ほかのページの編集と同じ判定）
   const [catName, setCatName] = useState(categories[0]?.name ?? "");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -99,7 +101,7 @@ const TacticsPage = () => {
           </h2>
           {tactic.note && <p className="text-sm text-muted-foreground mb-4 whitespace-pre-line">{tactic.note}</p>}
           <TacticsBoard tactic={tactic} />
-          <TacticVideos key={tactic.id} videos={tactic.videos} />
+          <TacticVideos key={tactic.id} tacticId={tactic.id} fileVideos={tactic.videos} isStaff={isStaff} memberName={memberName} />
         </>
       )}
     </div>

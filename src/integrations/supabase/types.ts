@@ -284,6 +284,39 @@ schedule_events: {
         }
         Relationships: []
       }
+tactic_videos: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          storage_path: string | null
+          tactic_id: string
+          title: string
+          type: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          storage_path?: string | null
+          tactic_id: string
+          title?: string
+          type: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          storage_path?: string | null
+          tactic_id?: string
+          title?: string
+          type?: string
+          url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
