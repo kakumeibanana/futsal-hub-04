@@ -42,6 +42,7 @@ export interface Tactic {
   names: { a: string[]; b: string[] };
   nameScale: number; // 名前の文字の大きさの倍率（作戦盤で調整した値）
   balloons: Balloon[][]; // コマごとのふきだし。frames と同じ数・同じ並び
+  videos: TacticVideo[]; // この作戦の参考動画（複数）
   pieces: Piece[];
   frames: { x: number; y: number }[][];
 }
@@ -162,6 +163,31 @@ const parseBalloons = (raw: any, n: number, vb: VBox, court: Court): Balloon[][]
   });
 };
 
+// 作戦に付ける参考動画。作戦盤で付けた URL が JSON の videos に入ってくる（1作戦に複数）。
+export interface TacticVideo {
+  url: string;
+  title: string; // 無ければ空
+}
+
+export const VIDEO_MAX = 6;
+
+// 外から来たデータは、http・https の URL だけを通す（javascript: などは捨てる）。多すぎるぶんも捨てる。
+export const parseVideos = (raw: unknown): TacticVideo[] => {
+  if (!Array.isArray(raw)) return [];
+  const out: TacticVideo[] = [];
+  for (const v of raw as any[]) {
+    if (out.length >= VIDEO_MAX) break;
+    const url = typeof v?.url === "string" ? v.url.trim() : "";
+    if (!/^https?:\/\/\S+$/i.test(url) || url.length > 500) continue;
+    out.push({ url, title: typeof v?.title === "string" ? v.title.trim().slice(0, 40) : "" });
+  }
+  return out;
+};
+
+// YouTube の動画ID（watch?v= / youtu.be / shorts / embed / live）。YouTube でなければ null
+export const youtubeId = (url: string): string | null =>
+  url.match(/(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1] ?? null;
+
 export const buildPieces = (a: number, b: number): Piece[] => [
   ...Array.from({ length: b }, (_, i): Piece => ({ t: "b", n: i + 1 })),
   ...Array.from({ length: a }, (_, i): Piece => ({ t: "a", n: i + 1 })),
@@ -217,6 +243,7 @@ export const parseTactic = (id: string, raw: any, category = "その他"): Tacti
     roster: { a, b },
     names: parseNames(raw.names),
     balloons: parseBalloons(raw.balloons, frames.length, vb, court),
+    videos: parseVideos(raw.videos),
     nameScale: isNum(raw.nameScale) ? Math.round(clamp(raw.nameScale, 0.5, 1.5) * 10) / 10 : 1,
     pieces,
     frames,

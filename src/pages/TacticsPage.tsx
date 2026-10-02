@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { categories, type Tactic } from "@/lib/tactics";
 import TacticsBoard from "@/components/TacticsBoard";
+import TacticVideos from "@/components/TacticVideos";
 import { Button } from "@/components/ui/button";
 
 // 作戦を作る・試す場所（別のサイト）。誰でも開ける。作戦盤の中身はその人のブラウザの中に保存されるだけで、
@@ -16,11 +17,12 @@ const TacticsPage = () => {
   const category = categories.find((c) => c.name === catName) ?? categories[0];
   const tactic = category?.tactics.find((t) => t.id === selectedId) ?? category?.tactics[0];
 
-  // 画面に出すのは「( )」の中身だけ。ただ、右と左に同じ名前（オーサワ1番など）があると見分けがつかないので、
-  // 同じカテゴリの中に同じ名前が複数あるときだけ、小さく「右」「左」を付ける。
+  // 画面に出すのは「( )」の中身だけ。ただ、右と左の作戦が同じカテゴリに混ざっていると、
+  // 名前だけでは、どちらか見分けがつかない（オーサワ1番が右にも左にある、など）。
+  // そこで、そのカテゴリに右と左の両方があるときだけ、すべての作戦に、小さく「右」「左」を付ける。
+  const hasBothSides = new Set(category?.tactics.map((x) => x.side).filter(Boolean)).size > 1;
   const sideTag = (t: Tactic) => {
-    const dup = category?.tactics.filter((x) => x.label === t.label).length > 1;
-    if (!dup || !t.side) return null;
+    if (!hasBothSides || !t.side) return null;
     return (
       <span className="mr-1.5 inline-block rounded border border-current/60 px-1 text-[11px] font-bold leading-4 align-[1px]">
         {t.side}
@@ -97,6 +99,7 @@ const TacticsPage = () => {
           </h2>
           {tactic.note && <p className="text-sm text-muted-foreground mb-4 whitespace-pre-line">{tactic.note}</p>}
           <TacticsBoard tactic={tactic} />
+          <TacticVideos key={tactic.id} videos={tactic.videos} />
         </>
       )}
     </div>
