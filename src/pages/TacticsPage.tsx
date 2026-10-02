@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { categories } from "@/lib/tactics";
+import { categories, type Tactic } from "@/lib/tactics";
 import TacticsBoard from "@/components/TacticsBoard";
 
 // 作戦が増えても1画面に収まるように、まずカテゴリ（フォルダ）を選び、その中の作戦を選ぶ。
@@ -9,6 +9,18 @@ const TacticsPage = () => {
 
   const category = categories.find((c) => c.name === catName) ?? categories[0];
   const tactic = category?.tactics.find((t) => t.id === selectedId) ?? category?.tactics[0];
+
+  // 画面に出すのは「( )」の中身だけ。ただ、右と左に同じ名前（オーサワ1番など）があると見分けがつかないので、
+  // 同じカテゴリの中に同じ名前が複数あるときだけ、小さく「右」「左」を付ける。
+  const sideTag = (t: Tactic) => {
+    const dup = category?.tactics.filter((x) => x.label === t.label).length > 1;
+    if (!dup || !t.side) return null;
+    return (
+      <span className="mr-1.5 inline-block rounded border border-current/60 px-1 text-[11px] font-bold leading-4 align-[1px]">
+        {t.side}
+      </span>
+    );
+  };
 
   const chooseCategory = (name: string) => {
     setCatName(name);
@@ -57,13 +69,17 @@ const TacticsPage = () => {
                       : "bg-background border-border text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {t.name}
+                  {sideTag(t)}
+                  {t.label}
                 </button>
               ))}
             </div>
           )}
 
-          <h2 className="font-bold text-lg mb-1">{tactic.name}</h2>
+          <h2 className="font-bold text-lg mb-1">
+            {sideTag(tactic)}
+            {tactic.label}
+          </h2>
           {tactic.note && <p className="text-sm text-muted-foreground mb-4 whitespace-pre-line">{tactic.note}</p>}
           <TacticsBoard tactic={tactic} />
         </>

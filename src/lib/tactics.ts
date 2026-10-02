@@ -34,7 +34,9 @@ export interface Tactic {
   id: string;
   category: string; // フォルダ名（無ければ「その他」）
   court: Court;
-  name: string;
+  name: string; // JSON の名前。「右コーナー(オーサワ1番)」のように、頭の「右コーナー」は識別用
+  label: string; // 画面に出す名前＝「( )」の中身。( ) が無ければ name そのまま
+  side: "右" | "左" | null; // 名前の頭が 右/左 のとき。同じ label が並ぶときの見分けに使う
   note?: string;
   roster: { a: number; b: number };
   names: { a: string[]; b: string[] };
@@ -158,11 +160,19 @@ export const parseTactic = (id: string, raw: any, category = "その他"): Tacti
     frames.push(frame);
   }
 
+  const name: string = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 40) : "作戦";
+  // 画面には「( )」の中身だけを出す（頭の「右コーナー」などは、どの作戦かを識別するための印）
+  const m = name.match(/[（(]([^）)]+)[）)]/);
+  const label = m && m[1].trim() ? m[1].trim() : name;
+  const side = name.startsWith("右") ? "右" : name.startsWith("左") ? "左" : null;
+
   return {
     id,
     category,
     court,
-    name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 40) : "作戦",
+    name,
+    label,
+    side,
     note: typeof raw.note === "string" ? raw.note : undefined,
     roster: { a, b },
     names: parseNames(raw.names),
