@@ -4,6 +4,10 @@ import { detectVideoType } from "@/lib/tactics";
 
 // 作戦ごとの参考動画（サイトで追加・削除する）。保存先は tactic_videos テーブルと、videos バケット（tactics/ の下）。
 // 作戦ID は「フォルダ/ファイル名」（例: コーナー/右コーナー(オーサワ1番)）。ファイル名を変えると、動画との結びつきが切れる。
+//
+// 1つの動画を、複数の作戦に付けられる（右と左、ホシナ2番①と②、など）。
+// そのとき、動画ファイルは1つのまま、作戦ごとに tactic_videos の行を1つずつ持つ（同じ url・storage_path）。
+// 外すときは、その作戦の行だけを消し、ファイルは、ほかの作戦に付いている間は消さない。
 
 export type TacticVideoType = "youtube" | "drive" | "link" | "upload";
 
@@ -15,6 +19,19 @@ export interface TacticVideoRow {
   url: string;
   storagePath: string | null;
   createdBy: string;
+}
+
+// 付ける動画そのもの（どの作戦に付けるかは別）
+export interface VideoSource {
+  title: string;
+  type: TacticVideoType;
+  url: string;
+  storagePath: string | null;
+}
+
+export interface AttachResult {
+  added: string[]; // 付けた作戦のID
+  skipped: { id: string; reason: "already" | "full" }[]; // 付けなかった作戦（すでに付いている／いっぱい）
 }
 
 export const DB_VIDEO_MAX = 10; // 1つの作戦に付けられる、サイトで追加した動画の数
@@ -73,22 +90,76 @@ export async function fetchTacticVideos(tacticId: string): Promise<TacticVideoRo
   return (data ?? []).map(toRow);
 }
 
-// リンク（YouTube・ドライブ・そのほか）を付ける
-export async function addLinkVideo(args: { tacticId: string; url: string; title: string; createdBy: string }) {
-  const url = normalizeVideoUrl(args.url);
-  if (!url) throw new Error("http:// か https:// で始まるURLを入れてください");
-  const { error } = await supabase.from("tactic_videos").insert({
-    tactic_id: args.tacticId,
-    title: args.title.trim().slice(0, TITLE_MAX),
-    type: detectVideoType(url),
-    url,
-    created_by: args.createdBy.slice(0, 60),
-  });
-  if (error) throw new Error("保存できませんでした。もう一度お試しください");
+// 同じ動画（同じURL）が付いている作戦のID
+export async function fetchTacticIdsWithUrl(url: string): Promise<string[]> {
+  const { data, error } = await supabase.from("tactic_videos").select("tactic_id").eq("url", url);
+  if (error) throw error;
+  return [...new Set((data ?? []).map((r) => r.tactic_id))];
 }
 
-// PCの動画ファイルをアップロードして付ける。保存に失敗したら、上げたファイルも消す。
-export async function addUploadVideo(args: { tacticId: string; file: File; title: string; createdBy: string }) {
+// 動画を、いくつかの作戦にまとめて付ける。
+// すでに同じ動画が付いている作戦と、動画がいっぱい（10本）の作戦は、飛ばす。付けた作戦と飛ばした作戦を返す。
+export async function attachVideo(args: { tacticIds: string[]; video: VideoSource; createdBy: string }): Promise<AttachResult> {
+  const ids = [...new Set(args.tacticIds)];
+  const { data: existing, error } = await supabase.from("tactic_videos").select("tactic_id, url").in("tactic_id", ids);
+  if (error) throw new Error("保存できませんでした。もう一度お試しください");
+
+  const count: Record<string, number> = {};
+  const has = new Set<string>();
+  for (const r of existing ?? []) {
+    count[r.tactic_id] = (count[r.tactic_id] ?? 0) + 1;
+    if (r.url === args.video.url) has.add(r.tactic_id);
+  }
+
+  const rows: { tactic_id: string; title: string; type: string; url: string; storage_path: string | null; created_by: string }[] = [];
+  const skipped: AttachResult["skipped"] = [];
+  for (const id of ids) {
+    if (has.has(id)) skipped.push({ id, reason: "already" });
+    else if ((count[id] ?? 0) >= DB_VIDEO_MAX) skipped.push({ id, reason: "full" });
+    else
+      rows.push({
+        tactic_id: id,
+        title: args.video.title.trim().slice(0, TITLE_MAX),
+        type: args.video.type,
+        url: args.video.url,
+        storage_path: args.video.storagePath,
+        created_by: args.createdBy.slice(0, 60),
+      });
+  }
+
+  if (rows.length > 0) {
+    const { error: e2 } = await supabase.from("tactic_videos").insert(rows); // 1回で全部入れる（途中までにならない）
+    if (e2) throw new Error("保存できませんでした。もう一度お試しください");
+  }
+  return { added: rows.map((r) => r.tactic_id), skipped };
+}
+
+// リンク（YouTube・ドライブ・そのほか）を付ける。alsoTo に、ほかの作戦のIDを入れると、まとめて付ける。
+export async function addLinkVideo(args: {
+  tacticId: string;
+  alsoTo?: string[];
+  url: string;
+  title: string;
+  createdBy: string;
+}): Promise<AttachResult> {
+  const url = normalizeVideoUrl(args.url);
+  if (!url) throw new Error("http:// か https:// で始まるURLを入れてください");
+  return attachVideo({
+    tacticIds: [args.tacticId, ...(args.alsoTo ?? [])],
+    video: { title: args.title, type: detectVideoType(url), url, storagePath: null },
+    createdBy: args.createdBy,
+  });
+}
+
+// PCの動画ファイルをアップロードして付ける（ファイルは1回だけ上げる）。
+// どこにも付けられなかったとき・保存に失敗したときは、上げたファイルも消す。
+export async function addUploadVideo(args: {
+  tacticId: string;
+  alsoTo?: string[];
+  file: File;
+  title: string;
+  createdBy: string;
+}): Promise<AttachResult> {
   const ext = fileExt(args.file);
   if (!ext) throw new Error("動画ファイル（mp4・mov・m4v・webm）を選んでください");
 
@@ -108,30 +179,36 @@ export async function addUploadVideo(args: { tacticId: string; file: File; title
   }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  const { error } = await supabase.from("tactic_videos").insert({
-    tactic_id: args.tacticId,
-    title: args.title.trim().slice(0, TITLE_MAX),
-    type: "upload",
-    url: data.publicUrl,
-    storage_path: path,
-    created_by: args.createdBy.slice(0, 60),
-  });
-  if (error) {
+  try {
+    const result = await attachVideo({
+      tacticIds: [args.tacticId, ...(args.alsoTo ?? [])],
+      video: { title: args.title, type: "upload", url: data.publicUrl, storagePath: path },
+      createdBy: args.createdBy,
+    });
+    if (result.added.length === 0) await supabase.storage.from(BUCKET).remove([path]); // どこにも付かなかったファイルは残さない
+    return result;
+  } catch (e) {
     await supabase.storage.from(BUCKET).remove([path]); // 表に入らなかったファイルは、残さない
-    throw new Error("保存できませんでした。もう一度お試しください");
+    throw e;
   }
 }
 
-// 動画を外す。アップロードしたファイルなら、ストレージのファイルも消す（失敗しても、表からは外れる）
+// 動画を、その作戦から外す。アップロードしたファイルは、ほかの作戦に付いていなければ、ストレージからも消す
+// （失敗しても、表からは外れる）。
 export async function removeTacticVideo(row: TacticVideoRow) {
   const { error } = await supabase.from("tactic_videos").delete().eq("id", row.id);
   if (error) throw new Error("外せませんでした。もう一度お試しください");
+
   if (row.type === "upload" && row.storagePath && row.storagePath.startsWith(`${PREFIX}/`)) {
-    await supabase.storage.from(BUCKET).remove([row.storagePath]);
+    const { data: others } = await supabase.from("tactic_videos").select("id").eq("storage_path", row.storagePath).limit(1);
+    if (!others || others.length === 0) {
+      await supabase.storage.from(BUCKET).remove([row.storagePath]);
+    }
   }
 }
 
 export const tacticVideosKey = (tacticId: string) => ["tactic-videos", tacticId] as const;
+export const TACTIC_VIDEOS_ALL_KEY = ["tactic-videos"] as const; // どの作戦の動画も、まとめて更新したいとき
 
 export const useTacticVideos = (tacticId: string) =>
   useQuery({

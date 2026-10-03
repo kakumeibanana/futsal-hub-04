@@ -1,23 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Loader2, Play, Plus, Trash2, Upload } from "lucide-react";
+import { ExternalLink, Link2, Loader2, Play, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { type TacticVideo, driveId, isDirectVideoUrl, youtubeId } from "@/lib/tactics";
 import {
   DB_VIDEO_MAX,
   TITLE_MAX,
   type TacticVideoRow,
+  type AttachResult,
+  TACTIC_VIDEOS_ALL_KEY,
   addLinkVideo,
   addUploadVideo,
+  attachVideo,
+  fetchTacticIdsWithUrl,
   isOwnUpload,
   isVideoFile,
   removeTacticVideo,
-  tacticVideosKey,
   useTacticVideos,
 } from "@/hooks/useTacticVideos";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import TacticPicker from "@/components/TacticPicker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // 作戦の参考動画。
@@ -52,7 +56,29 @@ const kindOf = (url: string, upload: boolean): Kind => {
   return "link";
 };
 
-const VideoCard = ({ item, index, canRemove, onRemove }: { item: Item; index: number; canRemove: boolean; onRemove: () => void }) => {
+// 付けた結果を、ひとことで（付けなかった作戦があれば、その数も）
+const summarize = (r: AttachResult) => {
+  const full = r.skipped.filter((x) => x.reason === "full").length;
+  const already = r.skipped.filter((x) => x.reason === "already").length;
+  const parts = [`${r.added.length} 個の作戦に付けました`];
+  if (already) parts.push(`${already} 個は、もう付いていました`);
+  if (full) parts.push(`${full} 個は、動画がいっぱい（${DB_VIDEO_MAX}本）で付けられませんでした`);
+  return parts.join("。");
+};
+
+const VideoCard = ({
+  item,
+  index,
+  canRemove,
+  onRemove,
+  onShare,
+}: {
+  item: Item;
+  index: number;
+  canRemove: boolean;
+  onRemove: () => void;
+  onShare: () => void;
+}) => {
   const yt = youtubeId(item.url);
   const dr = driveId(item.url);
   const [playing, setPlaying] = useState(false);
@@ -118,6 +144,17 @@ const VideoCard = ({ item, index, canRemove, onRemove }: { item: Item; index: nu
           {canRemove && (
             <button
               type="button"
+              onClick={onShare}
+              className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-primary transition-colors"
+              aria-label={`${title} をほかの作戦にも付ける`}
+              title="ほかの作戦にも付ける"
+            >
+              <Link2 size={14} />
+            </button>
+          )}
+          {canRemove && (
+            <button
+              type="button"
               onClick={onRemove}
               className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"
               aria-label={`${title} を外す`}
@@ -149,6 +186,8 @@ const AddVideoDialog = ({
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [also, setAlso] = useState<string[]>([]);
+  const [showPicker, setShowPicker] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -156,6 +195,8 @@ const AddVideoDialog = ({
     setUrl("");
     setTitle("");
     setFile(null);
+    setAlso([]);
+    setShowPicker(false);
     setError("");
   };
 
@@ -164,14 +205,15 @@ const AddVideoDialog = ({
     if (count >= DB_VIDEO_MAX) return setError(`1つの作戦に追加できる動画は ${DB_VIDEO_MAX} 本までです`);
     setBusy(true);
     try {
+      let result: AttachResult;
       if (tab === "link") {
-        await addLinkVideo({ tacticId, url, title, createdBy: memberName });
+        result = await addLinkVideo({ tacticId, alsoTo: also, url, title, createdBy: memberName });
       } else {
         if (!file) throw new Error("動画ファイルを選んでください");
-        await addUploadVideo({ tacticId, file, title, createdBy: memberName });
+        result = await addUploadVideo({ tacticId, alsoTo: also, file, title, createdBy: memberName });
       }
-      await qc.invalidateQueries({ queryKey: tacticVideosKey(tacticId) });
-      toast.success("動画を追加しました");
+      await qc.invalidateQueries({ queryKey: TACTIC_VIDEOS_ALL_KEY });
+      toast.success(also.length > 0 ? summarize(result) : "動画を追加しました");
       reset();
       onOpenChange(false);
     } catch (e) {
@@ -233,6 +275,17 @@ const AddVideoDialog = ({
             <Input id="tv-title" value={title} maxLength={TITLE_MAX} onChange={(e) => setTitle(e.target.value)} placeholder="例：本家のチョンドン" />
           </div>
 
+          <div>
+            <button type="button" onClick={() => setShowPicker((v) => !v)} aria-expanded={showPicker} className="text-xs font-semibold text-primary hover:underline">
+              {showPicker ? "▼" : "▶"} ほかの作戦にも付ける{also.length > 0 ? `（${also.length}）` : ""}
+            </button>
+            {showPicker && (
+              <div className="mt-2">
+                <TacticPicker selected={also} onChange={setAlso} excludeId={tacticId} />
+              </div>
+            )}
+          </div>
+
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
           <Button type="button" onClick={submit} disabled={busy} className="w-full gap-2">
@@ -240,6 +293,66 @@ const AddVideoDialog = ({
             {busy ? (tab === "file" ? "アップロード中…" : "追加中…") : "追加する"}
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// すでにある動画を、ほかの作戦にも付ける（ファイルは増えない）
+const ShareVideoDialog = ({ row, memberName, onClose }: { row: TacticVideoRow | null; memberName: string; onClose: () => void }) => {
+  const qc = useQueryClient();
+  const [picked, setPicked] = useState<string[]>([]);
+  const [attached, setAttached] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setPicked([]);
+    setError("");
+    setAttached([]);
+    if (!row) return;
+    let alive = true;
+    fetchTacticIdsWithUrl(row.url)
+      .then((ids) => alive && setAttached(ids))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [row]);
+
+  const submit = async () => {
+    if (!row || picked.length === 0) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await attachVideo({
+        tacticIds: picked,
+        video: { title: row.title, type: row.type, url: row.url, storagePath: row.storagePath },
+        createdBy: memberName,
+      });
+      await qc.invalidateQueries({ queryKey: TACTIC_VIDEOS_ALL_KEY });
+      toast.success(summarize(result));
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "付けられませんでした");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!row} onOpenChange={(v) => !busy && !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>ほかの作戦にも付ける</DialogTitle>
+          <DialogDescription className="break-all">「{row?.title || "この動画"}」を付けたい作戦を選んでください。動画ファイルは増えません。</DialogDescription>
+        </DialogHeader>
+        <TacticPicker selected={picked} onChange={setPicked} disabledIds={attached} />
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <Button type="button" onClick={submit} disabled={busy || picked.length === 0} className="w-full gap-2">
+          {busy ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
+          {busy ? "付けています…" : `${picked.length} 個の作戦に付ける`}
+        </Button>
       </DialogContent>
     </Dialog>
   );
@@ -259,6 +372,7 @@ const TacticVideos = ({
   const qc = useQueryClient();
   const { data: rows = [], isError } = useTacticVideos(tacticId);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [shareRow, setShareRow] = useState<TacticVideoRow | null>(null);
 
   const items: Item[] = [
     ...fileVideos.map((v, i) => ({ key: `f${i}-${v.url}`, url: v.url, title: v.title, kind: kindOf(v.url, false) })),
@@ -269,7 +383,7 @@ const TacticVideos = ({
     if (!window.confirm(`「${row.title || "この動画"}」を外しますか？`)) return;
     try {
       await removeTacticVideo(row);
-      await qc.invalidateQueries({ queryKey: tacticVideosKey(tacticId) });
+      await qc.invalidateQueries({ queryKey: TACTIC_VIDEOS_ALL_KEY });
       toast.success("動画を外しました");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "外せませんでした");
@@ -296,7 +410,14 @@ const TacticVideos = ({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {items.map((it, i) => (
-            <VideoCard key={it.key} item={it} index={i} canRemove={isStaff && !!it.row} onRemove={() => it.row && remove(it.row)} />
+            <VideoCard
+              key={it.key}
+              item={it}
+              index={i}
+              canRemove={isStaff && !!it.row}
+              onRemove={() => it.row && remove(it.row)}
+              onShare={() => it.row && setShareRow(it.row)}
+            />
           ))}
         </div>
       )}
@@ -304,6 +425,7 @@ const TacticVideos = ({
       {isError && isStaff && <p className="mt-2 text-xs text-muted-foreground">サイトで追加した動画を読み込めませんでした。</p>}
 
       {isStaff && <AddVideoDialog open={dialogOpen} onOpenChange={setDialogOpen} tacticId={tacticId} memberName={memberName} count={rows.length} />}
+      {isStaff && <ShareVideoDialog row={shareRow} memberName={memberName} onClose={() => setShareRow(null)} />}
     </section>
   );
 };

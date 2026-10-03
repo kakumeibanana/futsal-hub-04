@@ -12,14 +12,23 @@ const db = {
   uploads: [] as string[],
   removes: [] as string[],
   insertError: false,
+  existing: [] as any[], // 付ける先の作戦に、すでに付いている動画（tactic_id と url）
+  others: [] as any[], // 同じファイルを使っている、ほかの行
 };
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
-      select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: db.rows, error: null }) }) }),
+      select: () => ({
+        eq: (col: string) => {
+          const res = { data: col === "storage_path" ? db.others : col === "url" ? [] : db.rows, error: null };
+          return Object.assign(Promise.resolve(res), { order: () => Promise.resolve(res), limit: () => Promise.resolve(res) });
+        },
+        in: () => Promise.resolve({ data: db.existing, error: null }),
+      }),
       insert: (v: any) => {
-        db.inserts.push(v);
+        if (Array.isArray(v)) db.inserts.push(...v);
+        else db.inserts.push(v);
         return Promise.resolve({ error: db.insertError ? { message: "ng" } : null });
       },
       delete: () => ({
@@ -69,7 +78,7 @@ const renderIt = (props: Partial<React.ComponentProps<typeof TacticVideos>> = {}
 
 beforeEach(() => {
   vi.stubEnv("VITE_SUPABASE_URL", "https://x.supabase.co");
-  Object.assign(db, { rows: [], inserts: [], deletes: [], uploads: [], removes: [], insertError: false });
+  Object.assign(db, { rows: [], inserts: [], deletes: [], uploads: [], removes: [], insertError: false, existing: [], others: [] });
 });
 afterEach(() => {
   cleanup();
@@ -235,5 +244,104 @@ describe("外す（主将・幹部）", () => {
     renderIt({ isStaff: true, fileVideos: [{ url: "https://example.com/json", title: "JSONの動画" }] });
     expect(await screen.findByText("JSONの動画")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /JSONの動画 を外す/ })).toBeNull();
+  });
+});
+describe("ほかの作戦にも付ける（主将・幹部）", () => {
+  const openPicker = () => fireEvent.click(screen.getByRole("button", { name: /ほかの作戦にも付ける/ }));
+
+  it("追加するとき、「ホシナ」で絞って「表示中をすべて選ぶ」→ 選んだ作戦ぜんぶに、同じ動画を付ける（いま見ている作戦も含む）", async () => {
+    renderIt({ isStaff: true });
+    await openDialog();
+    fireEvent.change(document.querySelector("#tv-url")!, { target: { value: "https://youtu.be/dQw4w9WgXcQ" } });
+    openPicker();
+    fireEvent.change(screen.getByLabelText("作戦をさがす"), { target: { value: "ホシナ" } });
+    fireEvent.click(screen.getByRole("button", { name: "表示中をすべて選ぶ" }));
+    const n = screen.getAllByRole("checkbox").length;
+    expect(n).toBeGreaterThan(1);
+    expect(screen.getByText(`${n} 個の作戦を選んでいます`)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "追加する" }));
+    await waitFor(() => expect(db.inserts).toHaveLength(n + 1));
+    const ids = db.inserts.map((r) => r.tactic_id);
+    expect(ids[0]).toBe("コーナー/右コーナー(テスト)");
+    expect(new Set(ids).size).toBe(n + 1); // 重ならない
+    expect(ids.slice(1).every((id: string) => id.includes("ホシナ"))).toBe(true);
+    expect(new Set(db.inserts.map((r) => r.url)).size).toBe(1); // 同じ動画
+  });
+
+  it("PCのファイルは1回だけアップロードして、全部の作戦が同じファイルを指す", async () => {
+    renderIt({ isStaff: true });
+    await openDialog();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "PCのファイル" }), { button: 0 });
+    fireEvent.change(document.querySelector("#tv-file")!, { target: { files: [new File(["x"], "ホシナ解説.mp4", { type: "video/mp4" })] } });
+    openPicker();
+    fireEvent.change(screen.getByLabelText("作戦をさがす"), { target: { value: "ホシナ" } });
+    fireEvent.click(screen.getByRole("button", { name: "表示中をすべて選ぶ" }));
+    fireEvent.click(screen.getByRole("button", { name: "追加する" }));
+    await waitFor(() => expect(db.inserts.length).toBeGreaterThan(1));
+    expect(db.uploads).toHaveLength(1);
+    expect(new Set(db.inserts.map((r) => r.storage_path))).toEqual(new Set([db.uploads[0]]));
+    expect(db.removes).toHaveLength(0);
+  });
+
+  it("すでに付いている作戦・動画がいっぱい（10本）の作戦は、飛ばして、ほかには付ける", async () => {
+    renderIt({ isStaff: true });
+    await openDialog();
+    fireEvent.change(document.querySelector("#tv-url")!, { target: { value: "https://example.com/v" } });
+    openPicker();
+    fireEvent.change(screen.getByLabelText("作戦をさがす"), { target: { value: "ホシナ" } });
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes.length).toBeGreaterThan(2);
+    fireEvent.click(screen.getByRole("button", { name: "表示中をすべて選ぶ" }));
+    // 付ける先の最初の作戦は「もう付いている」、2つ目は「いっぱい」にする
+    const picked = screen.getAllByRole("checkbox");
+    const labels = picked.map((b) => b.closest("label")!.textContent);
+    expect(labels.length).toBe(boxes.length);
+    // 先にDBの状態を作ってから送る（実際のIDは、送る前に tactics から引く）
+    const { tactics } = await import("@/lib/tactics");
+    const targets = tactics.filter((t) => t.id.includes("ホシナ") && t.id !== "コーナー/右コーナー(テスト)");
+    db.existing = [
+      { tactic_id: targets[0].id, url: "https://example.com/v" },
+      ...Array.from({ length: 10 }, (_, i) => ({ tactic_id: targets[1].id, url: `https://example.com/o${i}` })),
+    ];
+    fireEvent.click(screen.getByRole("button", { name: "追加する" }));
+    await waitFor(() => expect(db.inserts.length).toBeGreaterThan(0));
+    const ids = db.inserts.map((r) => r.tactic_id);
+    expect(ids).not.toContain(targets[0].id);
+    expect(ids).not.toContain(targets[1].id);
+    expect(ids).toHaveLength(1 + targets.length - 2);
+  });
+
+  it("カードの「ほかの作戦にも付ける」から、すでにある動画を、あとで付け足せる（ファイルは増えない）", async () => {
+    db.rows = [row({ id: "u", title: "UP", type: "upload", url: STORAGE + "tactics/5-q.mp4", storage_path: "tactics/5-q.mp4" })];
+    renderIt({ isStaff: true });
+    fireEvent.click(await screen.findByRole("button", { name: /UP をほかの作戦にも付ける/ }));
+    const dlg = await screen.findByRole("dialog");
+    const input = dlg.querySelector("input[aria-label='作戦をさがす']")!;
+    fireEvent.change(input, { target: { value: "ホシナ" } });
+    fireEvent.click(screen.getByRole("button", { name: "表示中をすべて選ぶ" }));
+    const n = screen.getAllByRole("checkbox").length;
+    fireEvent.click(screen.getByRole("button", { name: `${n} 個の作戦に付ける` }));
+    await waitFor(() => expect(db.inserts).toHaveLength(n));
+    expect(db.uploads).toHaveLength(0);
+    expect(db.inserts.every((r) => r.storage_path === "tactics/5-q.mp4" && r.type === "upload" && r.title === "UP")).toBe(true);
+  });
+
+  it("一般の部員には「ほかの作戦にも付ける」は出ない", async () => {
+    db.rows = [row({ id: "l", title: "LK", type: "link" })];
+    renderIt({ isStaff: false });
+    await screen.findByText("LK");
+    expect(screen.queryByRole("button", { name: /ほかの作戦にも付ける/ })).toBeNull();
+  });
+});
+
+describe("外す：共有している動画のファイル", () => {
+  it("ほかの作戦も同じファイルを使っているあいだは、ストレージのファイルを消さない", async () => {
+    db.rows = [row({ id: "u", title: "UP", type: "upload", url: STORAGE + "tactics/9-z.mp4", storage_path: "tactics/9-z.mp4" })];
+    db.others = [{ id: "other" }];
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderIt({ isStaff: true });
+    fireEvent.click(await screen.findByRole("button", { name: /UP を外す/ }));
+    await waitFor(() => expect(db.deletes).toEqual(["u"]));
+    expect(db.removes).toHaveLength(0);
   });
 });
